@@ -325,7 +325,7 @@ export const messages = {
         probed: 'Probed {name}.',
         updated: '{name} updated.',
         deleted: '{name} deleted.',
-        exported: 'Exported {count} records to {path}.',
+        exported: 'Downloaded {count} records as {fileName}.',
         bulkSummary: '{action}: {succeeded} succeeded, {failed} failed, {skipped} skipped.',
       },
       dialogs: {
@@ -790,7 +790,7 @@ export const messages = {
         probed: '已探测 {name}。',
         updated: '{name} 已更新。',
         deleted: '{name} 已删除。',
-        exported: '已导出 {count} 条记录到 {path}。',
+        exported: '已下载 {count} 条记录：{fileName}。',
         bulkSummary: '{action}：成功 {succeeded} 项，失败 {failed} 项，跳过 {skipped} 项。',
       },
       dialogs: {

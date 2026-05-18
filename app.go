@@ -235,6 +235,14 @@ func (a *App) ExportAccounts(kind string, format string, path string) (backend.E
 	return service.ExportAccounts(kind, format, path)
 }
 
+func (a *App) ExportAccountsDownload(kind string, format string) (backend.ExportDownload, error) {
+	service, err := a.ensureBackend()
+	if err != nil {
+		return backend.ExportDownload{}, err
+	}
+	return service.ExportAccountsDownload(kind, format)
+}
+
 func (a *App) ListScanHistory(limit int) ([]backend.ScanSummary, error) {
 	service, err := a.ensureBackend()
 	if err != nil {

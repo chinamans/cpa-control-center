@@ -2,7 +2,7 @@ import { defineStore } from 'pinia'
 import {
   DeleteAccount,
   DeleteAccounts,
-  ExportAccounts,
+  ExportAccountsDownload,
   GetDashboardSnapshot,
   GetScanDetailsPage,
   ListAccountsPage,
@@ -19,7 +19,7 @@ import type {
   BulkAccountActionResult,
   DashboardSnapshot,
   DashboardSummary,
-  ExportResult,
+  ExportDownload,
   InventorySyncResult,
   ScanDetailPage,
   ScanSummary,
@@ -213,7 +213,7 @@ export const useAccountsStore = defineStore('accountsStore', {
     },
     async exportRecords(kind: 'invalid401' | 'quotaLimited', format: 'json' | 'csv') {
       try {
-        return await ExportAccounts(kind, format, '') as ExportResult
+        return await ExportAccountsDownload(kind, format) as ExportDownload
       } catch (error) {
         throw new Error(toErrorMessage(error))
       }

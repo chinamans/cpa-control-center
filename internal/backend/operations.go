@@ -1,10 +1,12 @@
 package backend
 
 import (
+	"bytes"
 	"context"
 	"encoding/csv"
 	"encoding/json"
 	"errors"
+	"io"
 	"os"
 	"slices"
 	"sync"
@@ -427,6 +429,38 @@ func (b *Backend) ExportAccounts(kind string, format string, path string) (Expor
 		Format:   format,
 		Path:     path,
 		Exported: len(selected),
+	}, nil
+}
+
+func (b *Backend) ExportAccountsDownload(kind string, format string) (ExportDownload, error) {
+	settings, err := b.store.LoadSettings()
+	if err != nil {
+		return ExportDownload{}, err
+	}
+
+	records, err := b.store.ListAccounts(AccountFilter{
+		Type:     settings.TargetType,
+		Provider: settings.Provider,
+	})
+	if err != nil {
+		return ExportDownload{}, err
+	}
+
+	selected := filterAccountsForExport(records, kind)
+	content, contentType, err := encodeExportContent(settings.Locale, selected, format)
+	if err != nil {
+		return ExportDownload{}, err
+	}
+
+	fileName := defaultExportFileName(kind, format)
+	b.emitLog("maintain", "info", msg(settings.Locale, "task.export.completed", len(selected), exportKindLabel(settings.Locale, kind), fileName))
+	return ExportDownload{
+		Kind:        kind,
+		Format:      format,
+		FileName:    fileName,
+		ContentType: contentType,
+		Content:     content,
+		Exported:    len(selected),
 	}, nil
 }
 
@@ -972,8 +1006,30 @@ func writeCSV(path string, locale string, records []AccountRecord) error {
 	}
 	defer file.Close()
 
-	writer := csv.NewWriter(file)
-	defer writer.Flush()
+	return writeCSVRows(file, locale, records)
+}
+
+func encodeExportContent(locale string, records []AccountRecord, format string) (string, string, error) {
+	switch format {
+	case "json":
+		data, err := json.MarshalIndent(records, "", "  ")
+		if err != nil {
+			return "", "", err
+		}
+		return string(data), "application/json;charset=utf-8", nil
+	case "csv":
+		var buffer bytes.Buffer
+		if err := writeCSVRows(&buffer, locale, records); err != nil {
+			return "", "", err
+		}
+		return buffer.String(), "text/csv;charset=utf-8", nil
+	default:
+		return "", "", errors.New(msg(locale, "error.unsupported_export_format", format))
+	}
+}
+
+func writeCSVRows(output io.Writer, locale string, records []AccountRecord) error {
+	writer := csv.NewWriter(output)
 
 	header := []string{
 		msg(locale, "csv.header.name"),
@@ -1012,5 +1068,6 @@ func writeCSV(path string, locale string, records []AccountRecord) error {
 			return err
 		}
 	}
+	writer.Flush()
 	return writer.Error()
 }

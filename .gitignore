@@ -10,7 +10,12 @@
 /frontend/dist/
 /frontend/node_modules/
 /frontend/package.json.md5
-/frontend/wailsjs/
+/frontend/wailsjs/*
+!/frontend/wailsjs/go/
+/frontend/wailsjs/go/*
+!/frontend/wailsjs/go/main/
+/frontend/wailsjs/go/main/*
+!/frontend/wailsjs/go/main/App.ts
 
 # Test coverage and temp artifacts
 /coverage/

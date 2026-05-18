@@ -244,6 +244,15 @@ export interface ExportResult {
   exported: number
 }
 
+export interface ExportDownload {
+  kind: string
+  format: string
+  fileName: string
+  contentType: string
+  content: string
+  exported: number
+}
+
 export interface ScanSummary {
   runId: number
   status: string

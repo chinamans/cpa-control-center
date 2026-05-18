@@ -241,6 +241,15 @@ type ExportResult struct {
 	Exported int    `json:"exported"`
 }
 
+type ExportDownload struct {
+	Kind        string `json:"kind"`
+	Format      string `json:"format"`
+	FileName    string `json:"fileName"`
+	ContentType string `json:"contentType"`
+	Content     string `json:"content"`
+	Exported    int    `json:"exported"`
+}
+
 type ScanSummary struct {
 	RunID             int64  `json:"runId"`
 	Status            string `json:"status"`

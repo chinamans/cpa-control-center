@@ -285,6 +285,16 @@ func (s *apiServer) dispatch(method string, args []json.RawMessage) (any, error)
 			return nil, err
 		}
 		return s.backend.ExportAccounts(kind, format, exportPath)
+	case "ExportAccountsDownload":
+		var kind string
+		var format string
+		if err := decodeArg(args, 0, &kind); err != nil {
+			return nil, err
+		}
+		if err := decodeArg(args, 1, &format); err != nil {
+			return nil, err
+		}
+		return s.backend.ExportAccountsDownload(kind, format)
 	case "ListScanHistory":
 		var limit int
 		if err := decodeArg(args, 0, &limit); err != nil {

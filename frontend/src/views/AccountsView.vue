@@ -149,10 +149,23 @@ function openDetailDialog(row: AccountRecord) {
   detailDialogOpen.value = true
 }
 
+function downloadTextFile(fileName: string, contentType: string, content: string) {
+  const blob = new Blob([content], { type: contentType || 'application/octet-stream' })
+  const url = URL.createObjectURL(blob)
+  const link = document.createElement('a')
+  link.href = url
+  link.download = fileName
+  document.body.appendChild(link)
+  link.click()
+  link.remove()
+  URL.revokeObjectURL(url)
+}
+
 async function exportKind(kind: 'invalid401' | 'quotaLimited', format: 'json' | 'csv') {
   try {
     const result = await accountsStore.exportRecords(kind, format)
-    ElMessage.success(t('accounts.messages.exported', { count: result.exported, path: result.path }))
+    downloadTextFile(result.fileName, result.contentType, result.content)
+    ElMessage.success(t('accounts.messages.exported', { count: result.exported, fileName: result.fileName }))
   } catch (error) {
     ElMessage.error(toErrorMessage(error))
   }
