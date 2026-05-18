@@ -1,0 +1,205 @@
+name: Build and release desktop apps
+
+on:
+  push:
+    branches:
+      - master
+      - main
+    tags:
+      - "v*"
+  pull_request:
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+  build:
+    name: Build ${{ matrix.label }}
+    runs-on: ${{ matrix.os }}
+    timeout-minutes: 40
+    strategy:
+      fail-fast: false
+      matrix:
+        include:
+          - label: Windows
+            os: windows-latest
+            platform: windows/amd64
+            artifact_name: cpa-control-center-windows-amd64-exe
+            release_file: cpa-control-center-windows-amd64.exe
+          - label: macOS
+            os: macos-latest
+            platform: darwin/universal
+            artifact_name: cpa-control-center-macos-universal-app
+            release_file: cpa-control-center-macos-universal.zip
+            release_artifact_name: cpa-control-center-macos-universal-package
+
+    env:
+      NODE_OPTIONS: "--max-old-space-size=4096"
+
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Set up Go
+        uses: actions/setup-go@v5
+        with:
+          go-version-file: go.mod
+
+      - name: Set up Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: 22
+          cache: npm
+          cache-dependency-path: frontend/package-lock.json
+
+      - name: Install Wails CLI
+        run: go install github.com/wailsapp/wails/v2/cmd/wails@v2.11.0
+
+      - name: Add Go bin to PATH
+        shell: bash
+        run: echo "$(go env GOPATH)/bin" >> "$GITHUB_PATH"
+
+      - name: Build Wails app
+        run: wails build -clean -platform ${{ matrix.platform }}
+
+      - name: Prepare Windows release asset
+        if: runner.os == 'Windows'
+        shell: pwsh
+        run: Copy-Item build/bin/cpa-control-center.exe build/bin/${{ matrix.release_file }} -Force
+
+      - name: Locate macOS app bundle
+        if: runner.os == 'macOS'
+        id: macos_bundle
+        shell: bash
+        run: |
+          APP_PATH="$(find build/bin -maxdepth 1 -name '*.app' -print -quit)"
+          if [[ -z "$APP_PATH" ]]; then
+            echo "Expected .app bundle not found in build/bin"
+            exit 1
+          fi
+          echo "app_path=$APP_PATH" >> "$GITHUB_OUTPUT"
+
+      - name: Prepare macOS release asset
+        if: runner.os == 'macOS'
+        shell: bash
+        run: |
+          APP_PATH="${{ steps.macos_bundle.outputs.app_path }}"
+          ditto -c -k --sequesterRsrc --keepParent "$APP_PATH" "build/bin/${{ matrix.release_file }}"
+
+      - name: Upload Windows build artifact
+        if: runner.os == 'Windows'
+        uses: actions/upload-artifact@v4
+        with:
+          name: ${{ matrix.artifact_name }}
+          if-no-files-found: error
+          path: build/bin/${{ matrix.release_file }}
+
+      - name: Upload macOS build artifact
+        if: runner.os == 'macOS'
+        uses: actions/upload-artifact@v4
+        with:
+          name: ${{ matrix.artifact_name }}
+          if-no-files-found: error
+          path: ${{ steps.macos_bundle.outputs.app_path }}
+
+      - name: Upload macOS release package artifact
+        if: runner.os == 'macOS' && startsWith(github.ref, 'refs/tags/v')
+        uses: actions/upload-artifact@v4
+        with:
+          name: ${{ matrix.release_artifact_name }}
+          if-no-files-found: error
+          path: build/bin/${{ matrix.release_file }}
+
+  release:
+    name: Publish GitHub Release
+    needs: build
+    if: startsWith(github.ref, 'refs/tags/v')
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+    permissions:
+      contents: write
+
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Download Windows release asset
+        uses: actions/download-artifact@v4
+        with:
+          name: cpa-control-center-windows-amd64-exe
+          path: release-assets/windows
+
+      - name: Download macOS release asset
+        uses: actions/download-artifact@v4
+        with:
+          name: cpa-control-center-macos-universal-package
+          path: release-assets/macos
+
+      - name: Flatten release asset paths
+        shell: bash
+        run: |
+          mkdir -p dist
+          find release-assets -type f -maxdepth 2 -print -exec cp {} dist/ \;
+
+      - name: Generate SHA256 checksums
+        shell: bash
+        run: |
+          cd dist
+          sha256sum * > SHA256SUMS.txt
+
+      - name: Generate automatic changelog
+        uses: actions/github-script@v7
+        with:
+          script: |
+            const fs = require('fs')
+            const tagName = context.ref.replace('refs/tags/', '')
+            const { data } = await github.rest.repos.generateReleaseNotes({
+              owner: context.repo.owner,
+              repo: context.repo.repo,
+              tag_name: tagName,
+            })
+            fs.writeFileSync('generated-release-notes.md', data.body || '', 'utf8')
+
+      - name: Build release notes
+        shell: bash
+        run: |
+          python - <<'PY'
+          import re
+          from pathlib import Path
+
+          default_template = Path(".github/release-notes/default.md")
+          template = default_template.read_text(encoding="utf-8")
+          changelog = Path("CHANGELOG.md").read_text(encoding="utf-8")
+          auto_notes = Path("generated-release-notes.md").read_text(encoding="utf-8").strip()
+          tag = "${{ github.ref_name }}"
+
+          curated_notes = ""
+          match = re.search(
+              rf"^##\s+{re.escape(tag)}\s*$\n(.*?)(?=^##\s+|\Z)",
+              changelog,
+              re.MULTILINE | re.DOTALL,
+          )
+          if match:
+              curated_notes = match.group(1).strip()
+          if not auto_notes:
+            auto_notes = "- No generated changelog available."
+          if not curated_notes:
+            curated_notes = "- No curated changelog entry found in `CHANGELOG.md` for this version."
+
+          release_notes = (
+            template
+            .replace("{{VERSION}}", tag)
+            .replace("{{CURATED_NOTES}}", curated_notes)
+            .replace("{{AUTO_NOTES}}", auto_notes)
+          )
+          Path("release-notes.md").write_text(release_notes.rstrip() + "\n", encoding="utf-8")
+          PY
+
+      - name: Create GitHub release
+        uses: softprops/action-gh-release@v2
+        with:
+          name: CPA Control Center ${{ github.ref_name }}
+          body_path: release-notes.md
+          files: |
+            dist/*

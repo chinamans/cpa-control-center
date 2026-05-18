@@ -1,0 +1,34 @@
+# Wails / app build output
+/build/bin/
+
+# Local Go build outputs
+/cpa-control-center
+/cpa-control-center.exe
+/*.test
+
+# Frontend build output and dependencies
+/frontend/dist/
+/frontend/node_modules/
+/frontend/package.json.md5
+/frontend/wailsjs/
+
+# Test coverage and temp artifacts
+/coverage/
+/coverage.out
+/frontend/coverage/
+/build/windows/installer/tmp/
+*.log
+*.prof
+*.tmp
+
+# Editor and OS noise
+/.serena/
+/.idea/
+/.vscode/
+Thumbs.db
+.DS_Store
+# Runtime data and secrets
+.env
+/data/
+# Local backup files
+*.bak-*

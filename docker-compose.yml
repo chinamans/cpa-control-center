@@ -1,0 +1,26 @@
+services:
+  cpa-control-center:
+    build:
+      context: .
+      dockerfile: Dockerfile
+    image: cpa-control-center:latest
+    container_name: cpa-control-center
+    restart: unless-stopped
+    networks:
+      - all-network
+    ports:
+      - "${CPA_CONTROL_CENTER_HTTP_PORT:-8088}:8080"
+    extra_hosts:
+      - "host.docker.internal:host-gateway"
+    environment:
+      CPA_CONTROL_CENTER_ADDR: ":8080"
+      CPA_CONTROL_CENTER_DATA_DIR: "/data"
+      CPA_CONTROL_CENTER_USERNAME: "${CPA_CONTROL_CENTER_USERNAME:-root}"
+      CPA_CONTROL_CENTER_PASSWORD: "${CPA_CONTROL_CENTER_PASSWORD}"
+      TZ: "${TZ:-Asia/Shanghai}"
+    volumes:
+      - ./data:/data
+
+networks:
+  all-network:
+    external: true
