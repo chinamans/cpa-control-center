@@ -1054,7 +1054,7 @@ func TestBackendRunScanMaintainAndExport(t *testing.T) {
 				"name":       "quota-codex.json",
 				"type":       "codex",
 				"provider":   "codex",
-				"auth_index": "quota",
+				"auth_index": "quota401",
 				"id_token":   `{"chatgpt_account_id":"acct-quota","plan_type":"pro"}`,
 			},
 			{

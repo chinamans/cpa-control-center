@@ -250,7 +250,8 @@ function changeDetailPageSize(pageSize: number) {
               <el-table-column prop="statusLabel" :label="t('dashboard.historyColumns.status')" width="110" />
               <el-table-column prop="filteredAccounts" :label="t('dashboard.historyColumns.filtered')" width="96" />
               <el-table-column prop="invalid401Count" :label="t('dashboard.historyColumns.invalid')" width="74" />
-              <el-table-column prop="quotaLimitedCount" :label="t('dashboard.historyColumns.quota')" width="84" />
+              <el-table-column prop="quota5hLimitedCount" :label="t('dashboard.historyColumns.quota5h')" width="104" />
+              <el-table-column prop="quotaWeeklyLimitedCount" :label="t('dashboard.historyColumns.quotaWeekly')" width="96" />
               <el-table-column prop="recoveredCount" :label="t('dashboard.historyColumns.recovered')" width="104" />
               <el-table-column prop="finishedAtLabel" :label="t('dashboard.historyColumns.finished')" min-width="180" />
               <el-table-column label="" width="120">
@@ -307,6 +308,14 @@ function changeDetailPageSize(pageSize: number) {
             <article class="scan-detail-metric">
               <span class="scan-detail-metric__label">{{ t('states.error') }}</span>
               <strong>{{ scanDetailSummary.errorCount }}</strong>
+            </article>
+            <article class="scan-detail-metric">
+              <span class="scan-detail-metric__label">{{ t('dashboard.historyColumns.quota5h') }}</span>
+              <strong>{{ scanDetailSummary.quota5hLimitedCount }}</strong>
+            </article>
+            <article class="scan-detail-metric">
+              <span class="scan-detail-metric__label">{{ t('dashboard.historyColumns.quotaWeekly') }}</span>
+              <strong>{{ scanDetailSummary.quotaWeeklyLimitedCount }}</strong>
             </article>
           </div>
 

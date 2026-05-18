@@ -666,10 +666,8 @@ func (b *Backend) runMaintain(ctx context.Context, settings AppSettings) (Mainta
 			invalid = append(invalid, record)
 		case stateRecovered:
 			recovered = append(recovered, record)
-		default:
-			if isQuotaLimitedState(record.StateKey) {
-				quota = append(quota, record)
-			}
+		case stateQuotaWeeklyLimited:
+			quota = append(quota, record)
 		}
 	}
 
