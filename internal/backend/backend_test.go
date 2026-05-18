@@ -490,7 +490,7 @@ func TestGetCachedCodexQuotaSnapshotLoadsPersistedSnapshot(t *testing.T) {
 		Plans: []CodexPlanQuotaSummary{
 			{
 				PlanType:     "plus",
-				AccountCount:  1,
+				AccountCount: 1,
 				FiveHour:     QuotaBucketSummary{Supported: true, SuccessCount: 1, TotalRemainingPercent: float64Ptr(0)},
 				Weekly:       QuotaBucketSummary{Supported: true, SuccessCount: 1, TotalRemainingPercent: float64Ptr(42)},
 			},
@@ -762,8 +762,8 @@ func TestRunScanTreatsUsageLimit401AsQuotaLimitedWhenInventoryMarkedUnavailable(
 	if len(records) != 1 {
 		t.Fatalf("expected one scanned record, got %d", len(records))
 	}
-	if records[0].StateKey != stateQuotaLimited || records[0].Invalid401 {
-		t.Fatalf("expected unavailable usage-limit record to stay quota_limited, got %+v", records[0])
+	if records[0].StateKey != stateQuotaWeeklyLimited || records[0].QuotaLimitKind != "weekly" || records[0].Invalid401 {
+		t.Fatalf("expected unavailable usage-limit record to become weekly quota-limited, got %+v", records[0])
 	}
 
 	snapshot, ok, err := service.store.LoadCodexQuotaSnapshot()
@@ -1269,7 +1269,7 @@ func TestBackendMaintainDisablesUsageLimit401Accounts(t *testing.T) {
 	if len(records) != 1 {
 		t.Fatalf("expected one record, got %d", len(records))
 	}
-	if records[0].StateKey != stateQuotaLimited || !records[0].Disabled {
+	if records[0].StateKey != stateQuotaWeeklyLimited || records[0].QuotaLimitKind != "weekly" || !records[0].Disabled {
 		t.Fatalf("expected disabled quota-limited record, got %+v", records[0])
 	}
 

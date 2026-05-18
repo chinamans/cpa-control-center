@@ -94,6 +94,7 @@ type AccountRecord struct {
 	RuntimeOnly      bool   `json:"runtimeOnly"`
 	Allowed          *bool  `json:"allowed"`
 	LimitReached     *bool  `json:"limitReached"`
+	QuotaLimitKind   string `json:"quotaLimitKind"`
 	Invalid401       bool   `json:"invalid401"`
 	QuotaLimited     bool   `json:"quotaLimited"`
 	Recovered        bool   `json:"recovered"`
@@ -117,15 +118,17 @@ type AccountRecord struct {
 }
 
 type DashboardSummary struct {
-	TotalAccounts     int    `json:"totalAccounts"`
-	FilteredAccounts  int    `json:"filteredAccounts"`
-	PendingCount      int    `json:"pendingCount"`
-	NormalCount       int    `json:"normalCount"`
-	Invalid401Count   int    `json:"invalid401Count"`
-	QuotaLimitedCount int    `json:"quotaLimitedCount"`
-	RecoveredCount    int    `json:"recoveredCount"`
-	ErrorCount        int    `json:"errorCount"`
-	LastScanAt        string `json:"lastScanAt"`
+	TotalAccounts           int    `json:"totalAccounts"`
+	FilteredAccounts        int    `json:"filteredAccounts"`
+	PendingCount            int    `json:"pendingCount"`
+	NormalCount             int    `json:"normalCount"`
+	Invalid401Count         int    `json:"invalid401Count"`
+	QuotaLimitedCount       int    `json:"quotaLimitedCount"`
+	Quota5hLimitedCount     int    `json:"quota5hLimitedCount"`
+	QuotaWeeklyLimitedCount int    `json:"quotaWeeklyLimitedCount"`
+	RecoveredCount          int    `json:"recoveredCount"`
+	ErrorCount              int    `json:"errorCount"`
+	LastScanAt              string `json:"lastScanAt"`
 }
 
 type DashboardSnapshot struct {
@@ -251,26 +254,28 @@ type ExportDownload struct {
 }
 
 type ScanSummary struct {
-	RunID             int64  `json:"runId"`
-	Status            string `json:"status"`
-	StartedAt         string `json:"startedAt"`
-	FinishedAt        string `json:"finishedAt"`
-	TotalAccounts     int    `json:"totalAccounts"`
-	FilteredAccounts  int    `json:"filteredAccounts"`
-	ProbedAccounts    int    `json:"probedAccounts"`
-	NormalCount       int    `json:"normalCount"`
-	Invalid401Count   int    `json:"invalid401Count"`
-	QuotaLimitedCount int    `json:"quotaLimitedCount"`
-	RecoveredCount    int    `json:"recoveredCount"`
-	ErrorCount        int    `json:"errorCount"`
-	Delete401         bool   `json:"delete401"`
-	QuotaAction       string `json:"quotaAction"`
-	AutoReenable      bool   `json:"autoReenable"`
-	ProbeWorkers      int    `json:"probeWorkers"`
-	ActionWorkers     int    `json:"actionWorkers"`
-	TimeoutSeconds    int    `json:"timeoutSeconds"`
-	Retries           int    `json:"retries"`
-	Message           string `json:"message"`
+	RunID                   int64  `json:"runId"`
+	Status                  string `json:"status"`
+	StartedAt               string `json:"startedAt"`
+	FinishedAt              string `json:"finishedAt"`
+	TotalAccounts           int    `json:"totalAccounts"`
+	FilteredAccounts        int    `json:"filteredAccounts"`
+	ProbedAccounts          int    `json:"probedAccounts"`
+	NormalCount             int    `json:"normalCount"`
+	Invalid401Count         int    `json:"invalid401Count"`
+	QuotaLimitedCount       int    `json:"quotaLimitedCount"`
+	Quota5hLimitedCount     int    `json:"quota5hLimitedCount"`
+	QuotaWeeklyLimitedCount int    `json:"quotaWeeklyLimitedCount"`
+	RecoveredCount          int    `json:"recoveredCount"`
+	ErrorCount              int    `json:"errorCount"`
+	Delete401               bool   `json:"delete401"`
+	QuotaAction             string `json:"quotaAction"`
+	AutoReenable            bool   `json:"autoReenable"`
+	ProbeWorkers            int    `json:"probeWorkers"`
+	ActionWorkers           int    `json:"actionWorkers"`
+	TimeoutSeconds          int    `json:"timeoutSeconds"`
+	Retries                 int    `json:"retries"`
+	Message                 string `json:"message"`
 }
 
 type ScanDetail struct {

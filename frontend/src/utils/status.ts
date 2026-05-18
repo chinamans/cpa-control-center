@@ -1,7 +1,16 @@
 import { i18n } from '@/i18n'
 import type { AccountRecord, AccountStateKey } from '@/types'
 
-export const stateOrder: AccountStateKey[] = ['pending', 'normal', 'invalid_401', 'quota_limited', 'recovered', 'error']
+export const stateOrder: AccountStateKey[] = [
+  'pending',
+  'normal',
+  'invalid_401',
+  'quota_5h_limited',
+  'quota_weekly_limited',
+  'quota_limited',
+  'recovered',
+  'error',
+]
 
 export function normalizeStateKey(state: string | null | undefined): AccountStateKey {
   const value = String(state ?? '').trim().toLowerCase()
@@ -22,6 +31,17 @@ export function normalizeStateKey(state: string | null | undefined): AccountStat
     case 'quota limited':
     case '额度用尽':
       return 'quota_limited'
+    case 'quota_5h_limited':
+    case 'quota 5h limited':
+    case '5-hour quota limited':
+    case '5h quota limited':
+    case '5小时额度用尽':
+      return 'quota_5h_limited'
+    case 'quota_weekly_limited':
+    case 'quota weekly limited':
+    case 'weekly quota limited':
+    case '周额度用尽':
+      return 'quota_weekly_limited'
     case 'recovered':
     case '可恢复':
       return 'recovered'
@@ -41,6 +61,8 @@ export function statusTagType(state: string): 'success' | 'danger' | 'warning' |
     case 'invalid_401':
       return 'danger'
     case 'quota_limited':
+    case 'quota_5h_limited':
+    case 'quota_weekly_limited':
       return 'warning'
     default:
       return 'info'
@@ -59,6 +81,12 @@ export function stateDescription(record: AccountRecord): string {
     return record.statusMessage
   }
   if (record.limitReached) {
+    if (normalizeStateKey(record.stateKey || record.state) === 'quota_5h_limited') {
+      return i18n.global.t('descriptions.quota5hReached')
+    }
+    if (normalizeStateKey(record.stateKey || record.state) === 'quota_weekly_limited') {
+      return i18n.global.t('descriptions.quotaWeeklyReached')
+    }
     return i18n.global.t('descriptions.quotaReached')
   }
   if (record.unavailable) {

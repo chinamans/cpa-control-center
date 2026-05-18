@@ -632,6 +632,8 @@ func (b *Backend) runScan(ctx context.Context, kind string, settings AppSettings
 	summary.NormalCount = dashboard.NormalCount
 	summary.Invalid401Count = dashboard.Invalid401Count
 	summary.QuotaLimitedCount = dashboard.QuotaLimitedCount
+	summary.Quota5hLimitedCount = dashboard.Quota5hLimitedCount
+	summary.QuotaWeeklyLimitedCount = dashboard.QuotaWeeklyLimitedCount
 	summary.RecoveredCount = dashboard.RecoveredCount
 	summary.ErrorCount = dashboard.ErrorCount
 
@@ -662,10 +664,12 @@ func (b *Backend) runMaintain(ctx context.Context, settings AppSettings) (Mainta
 		switch normalizeStateKey(record.StateKey) {
 		case stateInvalid401:
 			invalid = append(invalid, record)
-		case stateQuotaLimited:
-			quota = append(quota, record)
 		case stateRecovered:
 			recovered = append(recovered, record)
+		default:
+			if isQuotaLimitedState(record.StateKey) {
+				quota = append(quota, record)
+			}
 		}
 	}
 
@@ -879,9 +883,12 @@ func probeLogLevel(record AccountRecord) string {
 	switch normalizeStateKey(record.StateKey) {
 	case stateError:
 		return "error"
-	case stateInvalid401, stateQuotaLimited:
+	case stateInvalid401:
 		return "warning"
 	default:
+		if isQuotaLimitedState(record.StateKey) {
+			return "warning"
+		}
 		return "info"
 	}
 }
@@ -991,7 +998,7 @@ func filterAccountsForExport(records []AccountRecord, kind string) []AccountReco
 				selected = append(selected, record)
 			}
 		case "quotaLimited":
-			if normalizeStateKey(record.StateKey) == stateQuotaLimited {
+			if isQuotaLimitedState(record.StateKey) {
 				selected = append(selected, record)
 			}
 		}

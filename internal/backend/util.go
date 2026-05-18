@@ -276,7 +276,7 @@ func matchesAccountFilter(record AccountRecord, filter AccountFilter) bool {
 	if filter.Provider != "" && !strings.EqualFold(record.Provider, filter.Provider) {
 		return false
 	}
-	if filter.State != "" && normalizeStateKey(record.StateKey) != normalizeStateKey(filter.State) {
+	if filter.State != "" && !matchesStateFilter(record.StateKey, filter.State) {
 		return false
 	}
 	query := strings.ToLower(strings.TrimSpace(filter.Query))
@@ -298,6 +298,15 @@ func matchesAccountFilter(record AccountRecord, filter AccountFilter) bool {
 		}
 	}
 	return false
+}
+
+func matchesStateFilter(recordState string, filterState string) bool {
+	normalizedFilter := normalizeStateKey(filterState)
+	normalizedRecord := normalizeStateKey(recordState)
+	if normalizedFilter == stateQuotaLimited {
+		return isQuotaLimitedState(normalizedRecord)
+	}
+	return normalizedRecord == normalizedFilter
 }
 
 func sortAccounts(records []AccountRecord) {
@@ -421,7 +430,7 @@ func statusSortOrder(state string) int {
 	switch normalizeStateKey(state) {
 	case stateInvalid401:
 		return 0
-	case stateQuotaLimited:
+	case stateQuotaLimited, stateQuota5hLimited, stateQuotaWeeklyLimited:
 		return 1
 	case stateError:
 		return 2
@@ -500,6 +509,12 @@ func computeSummary(records []AccountRecord) DashboardSummary {
 			summary.Invalid401Count++
 		case stateQuotaLimited:
 			summary.QuotaLimitedCount++
+		case stateQuota5hLimited:
+			summary.Quota5hLimitedCount++
+			summary.QuotaLimitedCount++
+		case stateQuotaWeeklyLimited:
+			summary.QuotaWeeklyLimitedCount++
+			summary.QuotaLimitedCount++
 		case stateRecovered:
 			summary.RecoveredCount++
 		case stateError:
@@ -515,6 +530,12 @@ func computeSummary(records []AccountRecord) DashboardSummary {
 
 func sanitizeRecord(record AccountRecord) AccountRecord {
 	record.StateKey = normalizeStateKey(stringOr(record.StateKey, record.State))
+	if record.QuotaLimitKind == "" {
+		record.QuotaLimitKind = quotaLimitKindFromState(record.StateKey)
+	}
+	if record.QuotaLimited && !isQuotaLimitedState(record.StateKey) {
+		record.StateKey = quotaLimitStateKey(record.QuotaLimitKind)
+	}
 	record.State = record.StateKey
 	if record.Status == "" {
 		record.Status = record.StateKey
@@ -529,6 +550,7 @@ func carryProbeSnapshot(record AccountRecord, previous AccountRecord) AccountRec
 	record.StatusMessage = stringOr(record.StatusMessage, previous.StatusMessage)
 	record.Allowed = previous.Allowed
 	record.LimitReached = previous.LimitReached
+	record.QuotaLimitKind = previous.QuotaLimitKind
 	record.Invalid401 = previous.Invalid401
 	record.QuotaLimited = previous.QuotaLimited
 	record.Recovered = previous.Recovered

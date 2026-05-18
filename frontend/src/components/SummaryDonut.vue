@@ -48,7 +48,14 @@ const items = computed<DonutItem[]>(() => [
   { key: 'pending', value: props.summary.pendingCount, name: t('states.pending'), color: '#7c9eb2' },
   { key: 'normal', value: props.summary.normalCount, name: t('states.normal'), color: '#2f7d61' },
   { key: 'invalid_401', value: props.summary.invalid401Count, name: t('states.invalid_401'), color: '#c2410c' },
-  { key: 'quota_limited', value: props.summary.quotaLimitedCount, name: t('states.quota_limited'), color: '#d97706' },
+  { key: 'quota_5h_limited', value: props.summary.quota5hLimitedCount, name: t('states.quota_5h_limited'), color: '#d97706' },
+  { key: 'quota_weekly_limited', value: props.summary.quotaWeeklyLimitedCount, name: t('states.quota_weekly_limited'), color: '#b45309' },
+  {
+    key: 'quota_limited',
+    value: Math.max(0, props.summary.quotaLimitedCount - props.summary.quota5hLimitedCount - props.summary.quotaWeeklyLimitedCount),
+    name: t('states.quota_limited'),
+    color: '#f59e0b',
+  },
   { key: 'recovered', value: props.summary.recoveredCount, name: t('states.recovered'), color: '#3b82f6' },
   { key: 'error', value: props.summary.errorCount, name: t('states.error'), color: '#6b7280' },
 ].filter((item) => item.value > 0))

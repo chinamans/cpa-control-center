@@ -84,6 +84,8 @@ CREATE TABLE IF NOT EXISTS scan_runs (
 	normal_count INTEGER NOT NULL,
 	invalid_401_count INTEGER NOT NULL,
 	quota_limited_count INTEGER NOT NULL,
+	quota_5h_limited_count INTEGER NOT NULL DEFAULT 0,
+	quota_weekly_limited_count INTEGER NOT NULL DEFAULT 0,
 	recovered_count INTEGER NOT NULL,
 	error_count INTEGER NOT NULL,
 	delete_401 INTEGER NOT NULL,
@@ -128,6 +130,8 @@ CREATE TABLE IF NOT EXISTS quota_snapshots (
 		{table: "accounts_current", column: "email", definition: "TEXT NOT NULL DEFAULT ''"},
 		{table: "accounts_current", column: "plan_type", definition: "TEXT NOT NULL DEFAULT ''"},
 		{table: "accounts_current", column: "probe_error_text", definition: "TEXT NOT NULL DEFAULT ''"},
+		{table: "scan_runs", column: "quota_5h_limited_count", definition: "INTEGER NOT NULL DEFAULT 0"},
+		{table: "scan_runs", column: "quota_weekly_limited_count", definition: "INTEGER NOT NULL DEFAULT 0"},
 	} {
 		if err := s.ensureColumn(migration.table, migration.column, migration.definition); err != nil {
 			return err
@@ -376,6 +380,8 @@ func (s *Store) SummarizeAccounts(filter AccountFilter) (DashboardSummary, error
 		COALESCE(SUM(CASE WHEN state_key = ? THEN 1 ELSE 0 END), 0),
 		COALESCE(SUM(CASE WHEN state_key = ? THEN 1 ELSE 0 END), 0),
 		COALESCE(SUM(CASE WHEN state_key = ? THEN 1 ELSE 0 END), 0),
+		COALESCE(SUM(CASE WHEN state_key = ? THEN 1 ELSE 0 END), 0),
+		COALESCE(SUM(CASE WHEN state_key = ? THEN 1 ELSE 0 END), 0),
 		COALESCE(SUM(CASE WHEN state_key = ? THEN 1 ELSE 0 END), 0)
 	FROM accounts_current` + whereClause
 
@@ -384,6 +390,8 @@ func (s *Store) SummarizeAccounts(filter AccountFilter) (DashboardSummary, error
 		stateNormal,
 		stateInvalid401,
 		stateQuotaLimited,
+		stateQuota5hLimited,
+		stateQuotaWeeklyLimited,
 		stateRecovered,
 		stateError,
 	}
@@ -397,11 +405,14 @@ func (s *Store) SummarizeAccounts(filter AccountFilter) (DashboardSummary, error
 		&summary.NormalCount,
 		&summary.Invalid401Count,
 		&summary.QuotaLimitedCount,
+		&summary.Quota5hLimitedCount,
+		&summary.QuotaWeeklyLimitedCount,
 		&summary.RecoveredCount,
 		&summary.ErrorCount,
 	); err != nil {
 		return summary, err
 	}
+	summary.QuotaLimitedCount += summary.Quota5hLimitedCount + summary.QuotaWeeklyLimitedCount
 	return summary, nil
 }
 
@@ -524,9 +535,10 @@ func (s *Store) StartScanRun(settings AppSettings) (int64, error) {
 	result, err := s.db.Exec(
 		`INSERT INTO scan_runs (
 			status, started_at, finished_at, total_accounts, filtered_accounts, probed_accounts, normal_count,
-			invalid_401_count, quota_limited_count, recovered_count, error_count, delete_401, quota_action,
-			auto_reenable, probe_workers, action_workers, timeout_seconds, retries, message
-		) VALUES (?, ?, ?, 0, 0, 0, 0, 0, 0, 0, 0, ?, ?, ?, ?, ?, ?, ?, ?)`,
+			invalid_401_count, quota_limited_count, quota_5h_limited_count, quota_weekly_limited_count,
+			recovered_count, error_count, delete_401, quota_action, auto_reenable, probe_workers,
+			action_workers, timeout_seconds, retries, message
+		) VALUES (?, ?, ?, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, ?, ?, ?, ?, ?, ?, ?, ?)`,
 		"running",
 		nowISO(),
 		"",
@@ -556,6 +568,8 @@ func (s *Store) FinishScanRun(summary ScanSummary) error {
 			normal_count = ?,
 			invalid_401_count = ?,
 			quota_limited_count = ?,
+			quota_5h_limited_count = ?,
+			quota_weekly_limited_count = ?,
 			recovered_count = ?,
 			error_count = ?,
 			delete_401 = ?,
@@ -575,6 +589,8 @@ func (s *Store) FinishScanRun(summary ScanSummary) error {
 		summary.NormalCount,
 		summary.Invalid401Count,
 		summary.QuotaLimitedCount,
+		summary.Quota5hLimitedCount,
+		summary.QuotaWeeklyLimitedCount,
 		summary.RecoveredCount,
 		summary.ErrorCount,
 		boolToInt(summary.Delete401),
@@ -715,7 +731,8 @@ func (s *Store) ListScanHistory(limit int) ([]ScanSummary, error) {
 	}
 	rows, err := s.db.Query(
 		`SELECT run_id, status, started_at, finished_at, total_accounts, filtered_accounts, probed_accounts,
-		        normal_count, invalid_401_count, quota_limited_count, recovered_count, error_count, delete_401,
+		        normal_count, invalid_401_count, quota_limited_count, quota_5h_limited_count,
+		        quota_weekly_limited_count, recovered_count, error_count, delete_401,
 		        quota_action, auto_reenable, probe_workers, action_workers, timeout_seconds, retries, message
 		   FROM scan_runs
 		  ORDER BY run_id DESC
@@ -743,6 +760,8 @@ func (s *Store) ListScanHistory(limit int) ([]ScanSummary, error) {
 			&item.NormalCount,
 			&item.Invalid401Count,
 			&item.QuotaLimitedCount,
+			&item.Quota5hLimitedCount,
+			&item.QuotaWeeklyLimitedCount,
 			&item.RecoveredCount,
 			&item.ErrorCount,
 			&delete401,
@@ -857,7 +876,8 @@ func (s *Store) scanSummaryByRunID(runID int64) (ScanSummary, error) {
 
 	err := s.db.QueryRow(
 		`SELECT run_id, status, started_at, finished_at, total_accounts, filtered_accounts, probed_accounts,
-		        normal_count, invalid_401_count, quota_limited_count, recovered_count, error_count, delete_401,
+		        normal_count, invalid_401_count, quota_limited_count, quota_5h_limited_count,
+		        quota_weekly_limited_count, recovered_count, error_count, delete_401,
 		        quota_action, auto_reenable, probe_workers, action_workers, timeout_seconds, retries, message
 		   FROM scan_runs
 		  WHERE run_id = ?`,
@@ -873,6 +893,8 @@ func (s *Store) scanSummaryByRunID(runID int64) (ScanSummary, error) {
 		&summary.NormalCount,
 		&summary.Invalid401Count,
 		&summary.QuotaLimitedCount,
+		&summary.Quota5hLimitedCount,
+		&summary.QuotaWeeklyLimitedCount,
 		&summary.RecoveredCount,
 		&summary.ErrorCount,
 		&delete401,
@@ -921,8 +943,14 @@ func currentAccountsWhereClause(filter AccountFilter) (string, []any) {
 		args = append(args, strings.ToLower(trimmed))
 	}
 	if trimmed := strings.TrimSpace(filter.State); trimmed != "" {
-		conditions = append(conditions, `state_key = ?`)
-		args = append(args, normalizeStateKey(trimmed))
+		normalizedState := normalizeStateKey(trimmed)
+		if normalizedState == stateQuotaLimited {
+			conditions = append(conditions, `state_key IN (?, ?, ?)`)
+			args = append(args, stateQuotaLimited, stateQuota5hLimited, stateQuotaWeeklyLimited)
+		} else {
+			conditions = append(conditions, `state_key = ?`)
+			args = append(args, normalizedState)
+		}
 	}
 	if trimmed := strings.ToLower(strings.TrimSpace(filter.PlanType)); trimmed != "" {
 		conditions = append(conditions, `LOWER(plan_type) = ?`)
@@ -948,6 +976,8 @@ func currentAccountsOrderByClause() string {
 	return `CASE state_key
 		WHEN 'invalid_401' THEN 0
 		WHEN 'quota_limited' THEN 1
+		WHEN 'quota_5h_limited' THEN 1
+		WHEN 'quota_weekly_limited' THEN 1
 		WHEN 'error' THEN 2
 		WHEN 'recovered' THEN 3
 		WHEN 'normal' THEN 4

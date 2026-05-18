@@ -54,6 +54,8 @@ function emptySummary(): DashboardSummary {
     normalCount: 0,
     invalid401Count: 0,
     quotaLimitedCount: 0,
+    quota5hLimitedCount: 0,
+    quotaWeeklyLimitedCount: 0,
     recoveredCount: 0,
     errorCount: 0,
     lastScanAt: '',

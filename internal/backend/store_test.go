@@ -71,6 +71,30 @@ func TestStoreSettingsAndHistory(t *testing.T) {
 			UpdatedAt:      nowISO(),
 		},
 		{
+			Name:           "codex-3.json",
+			Type:           "codex",
+			Provider:       "codex",
+			Email:          "three@example.com",
+			PlanType:       "plus",
+			QuotaLimited:   true,
+			QuotaLimitKind: "five_hour",
+			State:          stateQuota5hLimited,
+			StateKey:       stateQuota5hLimited,
+			UpdatedAt:      nowISO(),
+		},
+		{
+			Name:           "codex-4.json",
+			Type:           "codex",
+			Provider:       "codex",
+			Email:          "four@example.com",
+			PlanType:       "team",
+			QuotaLimited:   true,
+			QuotaLimitKind: "weekly",
+			State:          stateQuotaWeeklyLimited,
+			StateKey:       stateQuotaWeeklyLimited,
+			UpdatedAt:      nowISO(),
+		},
+		{
 			Name:      "other-1.json",
 			Type:      "chatgpt",
 			Provider:  "other",
@@ -88,7 +112,7 @@ func TestStoreSettingsAndHistory(t *testing.T) {
 	if err != nil {
 		t.Fatalf("ListAccounts: %v", err)
 	}
-	if len(items) != 2 || items[0].Name != "codex-2.json" || items[1].Name != "codex-1.json" {
+	if len(items) != 4 || items[0].Name != "codex-3.json" || items[1].Name != "codex-4.json" || items[2].Name != "codex-2.json" || items[3].Name != "codex-1.json" {
 		t.Fatalf("unexpected accounts: %+v", items)
 	}
 
@@ -96,10 +120,10 @@ func TestStoreSettingsAndHistory(t *testing.T) {
 	if err != nil {
 		t.Fatalf("ListAccountsPage: %v", err)
 	}
-	if page.TotalRecords != 2 || len(page.Records) != 1 || len(page.ProviderOptions) != 1 || page.ProviderOptions[0] != "codex" {
+	if page.TotalRecords != 4 || len(page.Records) != 1 || len(page.ProviderOptions) != 1 || page.ProviderOptions[0] != "codex" {
 		t.Fatalf("unexpected account page: %+v", page)
 	}
-	if len(page.PlanOptions) != 2 || page.PlanOptions[0] != "free" || page.PlanOptions[1] != "pro" {
+	if len(page.PlanOptions) != 4 || page.PlanOptions[0] != "free" || page.PlanOptions[1] != "plus" || page.PlanOptions[2] != "pro" || page.PlanOptions[3] != "team" {
 		t.Fatalf("unexpected plan options: %+v", page.PlanOptions)
 	}
 
@@ -112,6 +136,30 @@ func TestStoreSettingsAndHistory(t *testing.T) {
 		t.Fatalf("unexpected disabled filter result: %+v", disabledItems)
 	}
 
+	fiveHourItems, err := store.ListAccounts(AccountFilter{Type: "codex", State: stateQuota5hLimited})
+	if err != nil {
+		t.Fatalf("ListAccounts 5h quota filter: %v", err)
+	}
+	if len(fiveHourItems) != 1 || fiveHourItems[0].Name != "codex-3.json" {
+		t.Fatalf("unexpected 5h quota filter result: %+v", fiveHourItems)
+	}
+
+	weeklyItems, err := store.ListAccounts(AccountFilter{Type: "codex", State: stateQuotaWeeklyLimited})
+	if err != nil {
+		t.Fatalf("ListAccounts weekly quota filter: %v", err)
+	}
+	if len(weeklyItems) != 1 || weeklyItems[0].Name != "codex-4.json" {
+		t.Fatalf("unexpected weekly quota filter result: %+v", weeklyItems)
+	}
+
+	quotaItems, err := store.ListAccounts(AccountFilter{Type: "codex", State: stateQuotaLimited})
+	if err != nil {
+		t.Fatalf("ListAccounts quota aggregate filter: %v", err)
+	}
+	if len(quotaItems) != 2 || quotaItems[0].Name != "codex-3.json" || quotaItems[1].Name != "codex-4.json" {
+		t.Fatalf("unexpected aggregate quota filter result: %+v", quotaItems)
+	}
+
 	proPage, err := store.ListAccountsPage(AccountFilter{Type: "codex", Provider: "codex", PlanType: "pro"}, 1, 10)
 	if err != nil {
 		t.Fatalf("ListAccountsPage plan filter: %v", err)
@@ -119,7 +167,7 @@ func TestStoreSettingsAndHistory(t *testing.T) {
 	if proPage.TotalRecords != 1 || len(proPage.Records) != 1 || proPage.Records[0].Name != "codex-1.json" {
 		t.Fatalf("unexpected plan filter page: %+v", proPage)
 	}
-	if len(proPage.PlanOptions) != 2 || proPage.PlanOptions[0] != "free" || proPage.PlanOptions[1] != "pro" {
+	if len(proPage.PlanOptions) != 4 || proPage.PlanOptions[0] != "free" || proPage.PlanOptions[1] != "plus" || proPage.PlanOptions[2] != "pro" || proPage.PlanOptions[3] != "team" {
 		t.Fatalf("unexpected plan options for filtered page: %+v", proPage.PlanOptions)
 	}
 
@@ -127,7 +175,7 @@ func TestStoreSettingsAndHistory(t *testing.T) {
 	if err != nil {
 		t.Fatalf("SummarizeAccounts: %v", err)
 	}
-	if summarySnapshot.FilteredAccounts != 2 || summarySnapshot.NormalCount != 1 || summarySnapshot.ErrorCount != 1 || summarySnapshot.PendingCount != 0 {
+	if summarySnapshot.FilteredAccounts != 4 || summarySnapshot.NormalCount != 1 || summarySnapshot.ErrorCount != 1 || summarySnapshot.QuotaLimitedCount != 2 || summarySnapshot.Quota5hLimitedCount != 1 || summarySnapshot.QuotaWeeklyLimitedCount != 1 || summarySnapshot.PendingCount != 0 {
 		t.Fatalf("unexpected account summary: %+v", summarySnapshot)
 	}
 

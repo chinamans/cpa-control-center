@@ -10,13 +10,15 @@ const (
 	localeEnglish = "en-US"
 	localeChinese = "zh-CN"
 
-	statePending      = "pending"
-	stateNormal       = "normal"
-	stateInvalid401   = "invalid_401"
-	stateQuotaLimited = "quota_limited"
-	stateRecovered    = "recovered"
-	stateError        = "error"
-	stateUntracked    = "untracked"
+	statePending            = "pending"
+	stateNormal             = "normal"
+	stateInvalid401         = "invalid_401"
+	stateQuotaLimited       = "quota_limited"
+	stateQuota5hLimited     = "quota_5h_limited"
+	stateQuotaWeeklyLimited = "quota_weekly_limited"
+	stateRecovered          = "recovered"
+	stateError              = "error"
+	stateUntracked          = "untracked"
 )
 
 var translations = map[string]map[string]string{
@@ -113,6 +115,8 @@ var translations = map[string]map[string]string{
 		"state.normal":                     "Normal",
 		"state.invalid_401":                "401 Invalid",
 		"state.quota_limited":              "Quota Limited",
+		"state.quota_5h_limited":           "5-hour Quota Limited",
+		"state.quota_weekly_limited":       "Weekly Quota Limited",
 		"state.recovered":                  "Recovered",
 		"state.error":                      "Error",
 		"state.untracked":                  "Untracked",
@@ -210,6 +214,8 @@ var translations = map[string]map[string]string{
 		"state.normal":                     "正常",
 		"state.invalid_401":                "401 失效",
 		"state.quota_limited":              "额度用尽",
+		"state.quota_5h_limited":           "5小时额度用尽",
+		"state.quota_weekly_limited":       "周额度用尽",
 		"state.recovered":                  "可恢复",
 		"state.error":                      "错误",
 		"state.untracked":                  "未探测",
@@ -262,6 +268,10 @@ func normalizeStateKey(state string) string {
 		return stateNormal
 	case stateInvalid401, "401 invalid", "401 失效", "401失效":
 		return stateInvalid401
+	case stateQuota5hLimited, "quota 5h limited", "5-hour quota limited", "5h quota limited", "5小时额度用尽":
+		return stateQuota5hLimited
+	case stateQuotaWeeklyLimited, "quota weekly limited", "weekly quota limited", "周额度用尽":
+		return stateQuotaWeeklyLimited
 	case stateQuotaLimited, "quota limited", "额度用尽":
 		return stateQuotaLimited
 	case stateRecovered, "可恢复":
@@ -277,6 +287,41 @@ func normalizeStateKey(state string) string {
 
 func stateLabel(locale string, stateKey string) string {
 	return msg(locale, "state."+normalizeStateKey(stateKey))
+}
+
+func isQuotaLimitedState(state string) bool {
+	switch normalizeStateKey(state) {
+	case stateQuotaLimited, stateQuota5hLimited, stateQuotaWeeklyLimited:
+		return true
+	default:
+		return false
+	}
+}
+
+func quotaLimitedStates() []string {
+	return []string{stateQuotaLimited, stateQuota5hLimited, stateQuotaWeeklyLimited}
+}
+
+func quotaLimitKindFromState(state string) string {
+	switch normalizeStateKey(state) {
+	case stateQuota5hLimited:
+		return "five_hour"
+	case stateQuotaWeeklyLimited:
+		return "weekly"
+	default:
+		return ""
+	}
+}
+
+func quotaLimitStateKey(kind string) string {
+	switch strings.ToLower(strings.TrimSpace(kind)) {
+	case "five_hour", "5h", "5_hour", "fivehour":
+		return stateQuota5hLimited
+	case "weekly", "week":
+		return stateQuotaWeeklyLimited
+	default:
+		return stateQuotaLimited
+	}
 }
 
 func taskName(locale string, taskKind string) string {

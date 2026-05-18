@@ -209,7 +209,10 @@ function changeDetailPageSize(pageSize: number) {
       <article class="stat-card">
         <span class="stat-label">{{ t('states.quota_limited') }}</span>
         <strong>{{ accountsStore.summary.quotaLimitedCount }}</strong>
-        <small>{{ t('dashboard.quotaHint', { action: quotaActionLabel(settingsStore.settings.quotaAction) }) }}</small>
+        <small>
+          {{ t('states.quota_5h_limited') }} {{ accountsStore.summary.quota5hLimitedCount }} ·
+          {{ t('states.quota_weekly_limited') }} {{ accountsStore.summary.quotaWeeklyLimitedCount }}
+        </small>
       </article>
       <article class="stat-card">
         <span class="stat-label">{{ t('states.recovered') }}</span>

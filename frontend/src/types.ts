@@ -7,6 +7,8 @@ export type AccountStateKey =
   | 'normal'
   | 'invalid_401'
   | 'quota_limited'
+  | 'quota_5h_limited'
+  | 'quota_weekly_limited'
   | 'recovered'
   | 'error'
   | 'untracked'
@@ -105,6 +107,7 @@ export interface AccountRecord {
   runtimeOnly: boolean
   allowed?: boolean | null
   limitReached?: boolean | null
+  quotaLimitKind: string
   invalid401: boolean
   quotaLimited: boolean
   recovered: boolean
@@ -134,6 +137,8 @@ export interface DashboardSummary {
   normalCount: number
   invalid401Count: number
   quotaLimitedCount: number
+  quota5hLimitedCount: number
+  quotaWeeklyLimitedCount: number
   recoveredCount: number
   errorCount: number
   lastScanAt: string
@@ -264,6 +269,8 @@ export interface ScanSummary {
   normalCount: number
   invalid401Count: number
   quotaLimitedCount: number
+  quota5hLimitedCount: number
+  quotaWeeklyLimitedCount: number
   recoveredCount: number
   errorCount: number
   delete401: boolean

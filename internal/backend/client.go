@@ -272,6 +272,9 @@ func (c *Client) probeUsageOnce(ctx context.Context, settings AppSettings, recor
 	}
 	if limitReached, ok := boolFromMap(rateLimit, "limit_reached"); ok {
 		result.Record.LimitReached = boolPtr(limitReached)
+		if limitReached {
+			result.Record.QuotaLimitKind = detectQuotaLimitKind(parsedBody)
+		}
 	}
 	if email := strings.TrimSpace(stringValue(parsedBody["email"])); email != "" {
 		result.Record.Email = email
@@ -300,6 +303,7 @@ func resetProbeState(record AccountRecord) AccountRecord {
 	record.ProbeErrorText = ""
 	record.Allowed = nil
 	record.LimitReached = nil
+	record.QuotaLimitKind = ""
 	record.Error = false
 	record.Invalid401 = false
 	record.QuotaLimited = false
@@ -557,6 +561,9 @@ func classifyAccountState(record AccountRecord) AccountRecord {
 	inventoryUnavailable := record.Unavailable && !hasLiveProbeSignal
 	record.Invalid401 = inventoryUnavailable || (intValue(record.APIStatusCode) == http.StatusUnauthorized && !usageLimitReached)
 	record.QuotaLimited = !record.Invalid401 && ((intValue(record.APIStatusCode) == http.StatusOK && boolValue(record.LimitReached)) || usageLimitReached)
+	if !record.QuotaLimited {
+		record.QuotaLimitKind = ""
+	}
 	record.Recovered = !record.Invalid401 &&
 		!record.QuotaLimited &&
 		record.Disabled &&
@@ -571,7 +578,7 @@ func classifyAccountState(record AccountRecord) AccountRecord {
 	case record.Invalid401:
 		record.StateKey = stateInvalid401
 	case record.QuotaLimited:
-		record.StateKey = stateQuotaLimited
+		record.StateKey = quotaLimitStateKey(record.QuotaLimitKind)
 	case record.Recovered:
 		record.StateKey = stateRecovered
 	case record.Error:
@@ -604,6 +611,46 @@ func applyUsageLimitDetails(record *AccountRecord, payload any) {
 	}
 	record.Allowed = boolPtr(false)
 	record.LimitReached = boolPtr(true)
+	record.QuotaLimitKind = detectUsageLimitErrorKind(errorPayload)
+}
+
+func detectQuotaLimitKind(payload map[string]any) string {
+	result, err := parseQuotaBucketResult(payload)
+	if err != nil {
+		return ""
+	}
+	switch {
+	case result.weekly != nil && result.weekly.remainingPercent <= 0:
+		return "weekly"
+	case result.fiveHour != nil && result.fiveHour.remainingPercent <= 0:
+		return "five_hour"
+	default:
+		return ""
+	}
+}
+
+func detectUsageLimitErrorKind(payload map[string]any) string {
+	if payload == nil {
+		return ""
+	}
+	if kind := strings.ToLower(strings.TrimSpace(stringValue(payload["limit_kind"]))); kind != "" {
+		switch kind {
+		case "weekly", "week":
+			return "weekly"
+		case "five_hour", "5h", "5_hour", "fivehour":
+			return "five_hour"
+		}
+	}
+	if seconds, ok := intValueFromAny(payload["resets_in_seconds"]); ok {
+		duration := time.Duration(seconds) * time.Second
+		switch {
+		case nearDuration(duration, 7*24*time.Hour, 36*time.Hour):
+			return "weekly"
+		case nearDuration(duration, 5*time.Hour, 2*time.Hour):
+			return "five_hour"
+		}
+	}
+	return ""
 }
 
 func findUsageLimitErrorPayload(payload any) map[string]any {

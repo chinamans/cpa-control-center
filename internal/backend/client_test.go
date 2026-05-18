@@ -457,8 +457,8 @@ func TestClientProbeTreatsUsageLimit401AsQuotaLimited(t *testing.T) {
 	}
 
 	probed := client.ProbeUsage(context.Background(), settings, record)
-	if probed.StateKey != stateQuotaLimited {
-		t.Fatalf("expected quota_limited state, got %+v", probed)
+	if probed.StateKey != stateQuotaWeeklyLimited || probed.QuotaLimitKind != "weekly" {
+		t.Fatalf("expected weekly quota-limited state, got %+v", probed)
 	}
 	if probed.Invalid401 {
 		t.Fatalf("usage_limit_reached should not be marked invalid_401: %+v", probed)
@@ -524,8 +524,8 @@ func TestClientProbeTreatsUsageLimit401AsQuotaLimitedWhenInventoryMarkedUnavaila
 	}
 
 	probed := client.ProbeUsage(context.Background(), settings, record)
-	if probed.StateKey != stateQuotaLimited {
-		t.Fatalf("expected quota_limited state, got %+v", probed)
+	if probed.StateKey != stateQuota5hLimited || probed.QuotaLimitKind != "five_hour" {
+		t.Fatalf("expected 5-hour quota-limited state, got %+v", probed)
 	}
 	if probed.Invalid401 {
 		t.Fatalf("usage_limit_reached should override stale unavailable/invalid_401 flags: %+v", probed)
@@ -576,8 +576,8 @@ func TestClientProbeTreatsDoubleEncodedUsageLimit401AsQuotaLimited(t *testing.T)
 	}
 
 	probed := client.ProbeUsage(context.Background(), settings, record)
-	if probed.StateKey != stateQuotaLimited {
-		t.Fatalf("expected quota_limited state from double-encoded body, got %+v", probed)
+	if probed.StateKey != stateQuota5hLimited || probed.QuotaLimitKind != "five_hour" {
+		t.Fatalf("expected 5-hour quota-limited state from double-encoded body, got %+v", probed)
 	}
 	if probed.Invalid401 {
 		t.Fatalf("double-encoded usage_limit_reached should not be marked invalid_401: %+v", probed)
