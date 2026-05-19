@@ -52,7 +52,12 @@ const startupFallbackMinWidth = 720
 const startupFallbackMinHeight = 480
 const viewportWidth = ref(window.innerWidth)
 const viewportHeight = ref(window.innerHeight)
-const isMacOS = /Mac|iPhone|iPad|iPod/.test(navigator.platform || navigator.userAgent)
+const platform = navigator.platform || ''
+const userAgent = navigator.userAgent || ''
+const isAppleTouchDevice = /iPhone|iPad|iPod/.test(platform) ||
+  /iPhone|iPad|iPod/.test(userAgent) ||
+  (platform === 'MacIntel' && navigator.maxTouchPoints > 1)
+const isMacOS = /Mac/.test(platform) && !isAppleTouchDevice
 
 const navItems = computed<Array<{ key: ViewKey; label: string; caption: string }>>(() => [
   { key: 'dashboard', label: t('nav.dashboard'), caption: t('nav.dashboardCaption') },
