@@ -1,4 +1,5 @@
 <script setup lang="ts">
+import { nextTick, onBeforeUnmount, onBeforeUpdate, onMounted, onUpdated, ref } from 'vue'
 import { useI18n } from 'vue-i18n'
 import type { CodexPlanQuotaSummary, QuotaBucketSummary, QuotaValueByPlan } from '@/types'
 import { formatDateTime } from '@/utils/format'
@@ -10,6 +11,66 @@ const props = defineProps<{
 }>()
 
 const { t } = useI18n()
+const quotaValueElements = ref<HTMLElement[]>([])
+let fitFrame: number | null = null
+let valueResizeObserver: ResizeObserver | null = null
+
+function bindQuotaValueElement(el: unknown) {
+  if (el instanceof HTMLElement) {
+    quotaValueElements.value.push(el)
+  }
+}
+
+function cssPixelValue(element: HTMLElement, name: string, fallback: number) {
+  const rawValue = window.getComputedStyle(element).getPropertyValue(name).trim()
+  const parsed = Number.parseFloat(rawValue)
+  return Number.isFinite(parsed) ? parsed : fallback
+}
+
+function fitQuotaValueElements() {
+  for (const element of quotaValueElements.value) {
+    const textElement = element.querySelector<HTMLElement>('.quota-bucket__value-text')
+    if (!textElement) {
+      continue
+    }
+
+    const availableWidth = Math.max(1, element.clientWidth)
+    const maxFontSize = cssPixelValue(element, '--quota-value-max-size', 52)
+    const minFontSize = cssPixelValue(element, '--quota-value-min-size', 18)
+    element.style.setProperty('--quota-value-font-size', `${maxFontSize}px`)
+
+    const textWidth = Math.max(1, textElement.scrollWidth)
+    const fittedSize = Math.max(
+      minFontSize,
+      Math.min(maxFontSize, Math.floor((maxFontSize * (availableWidth / textWidth)) * 10) / 10),
+    )
+    element.style.setProperty('--quota-value-font-size', `${fittedSize}px`)
+  }
+}
+
+function observeQuotaValueElements() {
+  valueResizeObserver?.disconnect()
+  valueResizeObserver = typeof ResizeObserver === 'undefined'
+    ? null
+    : new ResizeObserver(() => scheduleQuotaValueFit())
+  if (!valueResizeObserver) {
+    return
+  }
+  for (const element of quotaValueElements.value) {
+    valueResizeObserver.observe(element)
+  }
+}
+
+function scheduleQuotaValueFit() {
+  if (fitFrame !== null) {
+    window.cancelAnimationFrame(fitFrame)
+  }
+  fitFrame = window.requestAnimationFrame(() => {
+    fitFrame = null
+    observeQuotaValueElements()
+    fitQuotaValueElements()
+  })
+}
 
 function quotaUnitValue(planType: string, bucket: 'fiveHour' | 'weekly' | 'codeReviewWeekly') {
   if (bucket === 'codeReviewWeekly') {
@@ -56,6 +117,30 @@ function formatCapacity(bucket: QuotaBucketSummary) {
 function formatResetAt(value: string) {
   return value ? formatDateTime(value) : t('common.notAvailable')
 }
+
+onBeforeUpdate(() => {
+  quotaValueElements.value = []
+})
+
+onUpdated(() => {
+  scheduleQuotaValueFit()
+})
+
+onMounted(async () => {
+  await nextTick()
+  scheduleQuotaValueFit()
+  window.addEventListener('resize', scheduleQuotaValueFit)
+})
+
+onBeforeUnmount(() => {
+  if (fitFrame !== null) {
+    window.cancelAnimationFrame(fitFrame)
+    fitFrame = null
+  }
+  valueResizeObserver?.disconnect()
+  valueResizeObserver = null
+  window.removeEventListener('resize', scheduleQuotaValueFit)
+})
 </script>
 
 <template>
@@ -77,8 +162,8 @@ function formatResetAt(value: string) {
             <strong>{{ t('quotas.buckets.fiveHour') }}</strong>
             <span>{{ coverageLabel(plan.fiveHour.successCount, plan.fiveHour.failedCount) }}</span>
           </div>
-          <div class="quota-bucket__value quota-bucket__value--hero">
-            {{ formatTotalRemainingValue(plan.planType, 'fiveHour', plan.fiveHour.totalRemainingPercent) }}
+          <div :ref="bindQuotaValueElement" class="quota-bucket__value quota-bucket__value--hero">
+            <span class="quota-bucket__value-text">{{ formatTotalRemainingValue(plan.planType, 'fiveHour', plan.fiveHour.totalRemainingPercent) }}</span>
           </div>
           <div class="quota-bucket__meter" aria-hidden="true">
             <span class="quota-bucket__meter-fill" :style="{ width: `${quotaNormalizedFill(plan.fiveHour)}%`, backgroundColor: quotaMeterColor(plan.fiveHour) }" />
@@ -97,8 +182,8 @@ function formatResetAt(value: string) {
             <strong>{{ t('quotas.buckets.weekly') }}</strong>
             <span>{{ coverageLabel(plan.weekly.successCount, plan.weekly.failedCount) }}</span>
           </div>
-          <div class="quota-bucket__value quota-bucket__value--hero">
-            {{ formatTotalRemainingValue(plan.planType, 'weekly', plan.weekly.totalRemainingPercent) }}
+          <div :ref="bindQuotaValueElement" class="quota-bucket__value quota-bucket__value--hero">
+            <span class="quota-bucket__value-text">{{ formatTotalRemainingValue(plan.planType, 'weekly', plan.weekly.totalRemainingPercent) }}</span>
           </div>
           <div class="quota-bucket__meter" aria-hidden="true">
             <span class="quota-bucket__meter-fill" :style="{ width: `${quotaNormalizedFill(plan.weekly)}%`, backgroundColor: quotaMeterColor(plan.weekly) }" />
@@ -117,8 +202,8 @@ function formatResetAt(value: string) {
             <strong>{{ t('quotas.buckets.codeReviewWeekly') }}</strong>
             <span>{{ coverageLabel(plan.codeReviewWeekly.successCount, plan.codeReviewWeekly.failedCount) }}</span>
           </div>
-          <div class="quota-bucket__value quota-bucket__value--hero">
-            {{ formatTotalRemainingValue(plan.planType, 'codeReviewWeekly', plan.codeReviewWeekly.totalRemainingPercent) }}
+          <div :ref="bindQuotaValueElement" class="quota-bucket__value quota-bucket__value--hero">
+            <span class="quota-bucket__value-text">{{ formatTotalRemainingValue(plan.planType, 'codeReviewWeekly', plan.codeReviewWeekly.totalRemainingPercent) }}</span>
           </div>
           <div class="quota-bucket__meter" aria-hidden="true">
             <span class="quota-bucket__meter-fill" :style="{ width: `${quotaNormalizedFill(plan.codeReviewWeekly)}%`, backgroundColor: quotaMeterColor(plan.codeReviewWeekly) }" />

@@ -2276,14 +2276,24 @@ select {
 }
 
 .quota-bucket__value--hero {
-  font-size: 2.1rem;
-  font-size: clamp(1.25rem, 6.6cqw, 3.2rem);
+  --quota-value-min-size: 18px;
+  --quota-value-max-size: 51px;
+  --quota-value-font-size: var(--quota-value-max-size);
+  display: block;
+  font-size: var(--quota-value-font-size);
   letter-spacing: 0;
   min-width: 0;
   max-width: 100%;
   overflow-wrap: normal;
+  overflow: hidden;
   white-space: nowrap;
   word-break: keep-all;
+}
+
+.quota-bucket__value-text {
+  display: inline-block;
+  max-width: none;
+  white-space: nowrap;
 }
 
 .quota-bucket__meter {
@@ -3532,8 +3542,8 @@ select {
 }
 
 .app-shell--compact .quota-bucket__value--hero {
-  font-size: 1.85rem;
-  font-size: clamp(1.2rem, 6.6cqw, 2.55rem);
+  --quota-value-min-size: 18px;
+  --quota-value-max-size: 41px;
 }
 
 .app-shell--compact .quota-workspace-tabs {
