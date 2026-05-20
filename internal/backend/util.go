@@ -375,6 +375,27 @@ func inventoryFingerprintChanged(record AccountRecord, previous AccountRecord) b
 }
 
 func markPending(record AccountRecord) AccountRecord {
+	if weeklyQuotaDisabledCandidate(record) {
+		if record.ManagedReason == "" {
+			record.ManagedReason = "quota_disabled"
+		}
+		record.State = stateQuotaWeeklyLimited
+		record.StateKey = stateQuotaWeeklyLimited
+		record.Status = stateQuotaWeeklyLimited
+		record.QuotaLimitKind = "weekly"
+		record.QuotaLimited = true
+		record.LastProbedAt = ""
+		record.APIHTTPStatus = nil
+		record.APIStatusCode = nil
+		record.ProbeErrorKind = ""
+		record.ProbeErrorText = ""
+		record.Allowed = nil
+		record.LimitReached = nil
+		record.Invalid401 = false
+		record.Recovered = false
+		record.Error = false
+		return sanitizeRecord(record)
+	}
 	record.State = statePending
 	record.StateKey = statePending
 	record.LastProbedAt = ""
@@ -573,6 +594,10 @@ func carryInventorySnapshot(record AccountRecord, previous *AccountRecord) Accou
 	if previous == nil {
 		return markPending(record)
 	}
+	preserveQuotaDisabledReason(&record, *previous)
+	if weeklyQuotaDisabledCandidate(record) && !weeklyQuotaProvenance(*previous) {
+		return markPending(record)
+	}
 	if previous.LastProbedAt != "" {
 		if inventoryFingerprintChanged(record, *previous) {
 			return markPending(record)
@@ -580,4 +605,29 @@ func carryInventorySnapshot(record AccountRecord, previous *AccountRecord) Accou
 		return carryProbeSnapshot(record, *previous)
 	}
 	return markPending(record)
+}
+
+func preserveQuotaDisabledReason(record *AccountRecord, previous AccountRecord) {
+	if record == nil || !record.Disabled || record.ManagedReason != "" {
+		return
+	}
+	if previous.ManagedReason != "manual_disabled" && weeklyQuotaProvenance(previous) {
+		record.ManagedReason = "quota_disabled"
+	}
+}
+
+func weeklyQuotaDisabledCandidate(record AccountRecord) bool {
+	if !record.Disabled || record.ManagedReason == "manual_disabled" {
+		return false
+	}
+	if record.ManagedReason == "quota_disabled" || record.ManagedReason == "" {
+		return true
+	}
+	return weeklyQuotaProvenance(record)
+}
+
+func weeklyQuotaProvenance(record AccountRecord) bool {
+	return normalizeStateKey(record.StateKey) == stateQuotaWeeklyLimited ||
+		quotaLimitKindFromState(record.StateKey) == "weekly" ||
+		record.QuotaLimitKind == "weekly"
 }

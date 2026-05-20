@@ -566,8 +566,7 @@ func classifyAccountState(record AccountRecord) AccountRecord {
 	}
 	record.Recovered = !record.Invalid401 &&
 		!record.QuotaLimited &&
-		record.Disabled &&
-		record.ManagedReason == "quota_disabled" &&
+		quotaDisabledRecoveryCandidate(record) &&
 		intValue(record.APIStatusCode) == http.StatusOK &&
 		boolValue(record.Allowed) &&
 		record.LimitReached != nil &&
@@ -582,7 +581,14 @@ func classifyAccountState(record AccountRecord) AccountRecord {
 	case record.Recovered:
 		record.StateKey = stateRecovered
 	case record.Error:
-		record.StateKey = stateError
+		if weeklyQuotaDisabledCandidate(record) {
+			record.StateKey = stateQuotaWeeklyLimited
+			record.QuotaLimitKind = "weekly"
+			record.QuotaLimited = true
+			record.Error = false
+		} else {
+			record.StateKey = stateError
+		}
 	case intValue(record.APIStatusCode) == http.StatusOK:
 		record.StateKey = stateNormal
 	default:
@@ -592,6 +598,10 @@ func classifyAccountState(record AccountRecord) AccountRecord {
 
 	record.UpdatedAt = nowISO()
 	return record
+}
+
+func quotaDisabledRecoveryCandidate(record AccountRecord) bool {
+	return weeklyQuotaDisabledCandidate(record)
 }
 
 func applyUsageLimitDetails(record *AccountRecord, payload any) {
