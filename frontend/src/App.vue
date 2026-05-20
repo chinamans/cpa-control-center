@@ -476,12 +476,26 @@ watch(debugVisible, (visible) => {
       <div :key="shellRevision" class="app-shell" :class="shellClasses">
         <div v-if="isMacOS" class="window-titlebar" aria-hidden="true" />
         <aside class="app-sidebar">
-          <div>
+          <div class="sidebar-brand">
             <p class="sidebar-kicker">{{ t('app.name') }}</p>
             <h1>{{ t('app.headline') }}</h1>
-            <p class="sidebar-copy">
-              {{ t('app.copy') }}
-            </p>
+            <div class="sidebar-cat" aria-hidden="true">
+              <span class="cat-ear cat-ear--left" />
+              <span class="cat-ear cat-ear--right" />
+              <span class="cat-face">
+                <span class="cat-eye cat-eye--left" />
+                <span class="cat-eye cat-eye--right" />
+                <span class="cat-nose" />
+                <span class="cat-mouth cat-mouth--left" />
+                <span class="cat-mouth cat-mouth--right" />
+                <span class="cat-whisker cat-whisker--left cat-whisker--top" />
+                <span class="cat-whisker cat-whisker--left cat-whisker--bottom" />
+                <span class="cat-whisker cat-whisker--right cat-whisker--top" />
+                <span class="cat-whisker cat-whisker--right cat-whisker--bottom" />
+              </span>
+              <span class="cat-paw cat-paw--left" />
+              <span class="cat-paw cat-paw--right" />
+            </div>
           </div>
 
           <nav class="nav-list">

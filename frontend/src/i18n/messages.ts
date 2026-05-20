@@ -2,8 +2,7 @@ export const messages = {
   'en-US': {
     app: {
       name: 'CPA Control Center',
-      headline: 'Desktop codex pool control.',
-      copy: 'Connect once with the CPA URL and management token, then manage the auth pool from a native window.',
+      headline: 'Codex Pool Console',
     },
     nav: {
       dashboard: 'Dashboard',
@@ -473,8 +472,7 @@ export const messages = {
   'zh-CN': {
     app: {
       name: 'CPA Control Center',
-      headline: '桌面版 Codex 号池控制台。',
-      copy: '填写 CPA 地址和管理令牌后，就可以在原生窗口里直接管理 auth 号池。',
+      headline: 'Codex 号池控制台',
     },
     nav: {
       dashboard: '仪表盘',
