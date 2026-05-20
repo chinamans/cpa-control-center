@@ -17,9 +17,11 @@ services:
       CPA_CONTROL_CENTER_DATA_DIR: "/data"
       CPA_CONTROL_CENTER_USERNAME: "${CPA_CONTROL_CENTER_USERNAME:-root}"
       CPA_CONTROL_CENTER_PASSWORD: "${CPA_CONTROL_CENTER_PASSWORD}"
+      CPA_AUTH_FILES_DIR: "/auth-files"
       TZ: "${TZ:-Asia/Shanghai}"
     volumes:
       - ./data:/data
+      - "${CPA_AUTH_FILES_HOST_DIR:-/mnt/appdata/account-upload-manager-data/processed}:/auth-files:ro"
 
 networks:
   all-network:

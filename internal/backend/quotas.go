@@ -158,9 +158,11 @@ func (b *Backend) selectQuotaRecords(settings AppSettings, files []map[string]an
 	records := make([]AccountRecord, 0, len(files))
 	freeSelected := 0
 	freeLimit := settings.QuotaFreeMaxAccounts
+	localAuthIdentities := loadLocalAuthIdentityIndex()
 
 	for _, item := range files {
 		record := b.buildQuotaRecord(item, timestamp)
+		record = localAuthIdentities.enrich(record)
 		if record.Name == "" {
 			continue
 		}

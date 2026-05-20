@@ -208,6 +208,7 @@ func (b *Backend) syncInventoryFromFilesWithProgress(
 	}
 
 	timestamp := nowISO()
+	localAuthIdentities := loadLocalAuthIdentityIndex()
 	records := make([]AccountRecord, 0, len(files))
 	filteredCount := 0
 	for _, item := range files {
@@ -224,6 +225,7 @@ func (b *Backend) syncInventoryFromFilesWithProgress(
 			previous = &currentCopy
 		}
 		record := b.client.BuildAccountRecord(item, previous, timestamp)
+		record = localAuthIdentities.enrich(record)
 		record = carryInventorySnapshot(record, previous)
 		if matchesInventoryFilter(record, settings) {
 			filteredCount++

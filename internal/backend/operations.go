@@ -155,6 +155,7 @@ func (b *Backend) refreshProbeRecordIdentity(ctx context.Context, settings AppSe
 	}
 	normalizedName := normalizeManagedAccountName(record.Name)
 	recordEmail := strings.ToLower(strings.TrimSpace(record.Email))
+	localAuthIdentities := loadLocalAuthIdentityIndex()
 	for _, item := range files {
 		itemName := strings.TrimSpace(stringValue(item["name"]))
 		if itemName == "" {
@@ -167,9 +168,10 @@ func (b *Backend) refreshProbeRecordIdentity(ctx context.Context, settings AppSe
 		}
 		previous := record
 		refreshed := b.client.BuildAccountRecord(item, &previous, nowISO())
+		refreshed = localAuthIdentities.enrich(refreshed)
 		return carryProbeSnapshot(refreshed, previous)
 	}
-	return record
+	return localAuthIdentities.enrich(record)
 }
 
 func (b *Backend) ProbeAccounts(names []string) (BulkAccountActionResult, error) {
@@ -551,6 +553,7 @@ func (b *Backend) runScan(ctx context.Context, kind string, settings AppSettings
 	}
 
 	timestamp := nowISO()
+	localAuthIdentities := loadLocalAuthIdentityIndex()
 	probeCandidates := make([]AccountRecord, 0, len(files))
 	probeCandidateIndexes := make([]int, 0, len(files))
 	recordIndexes := make(map[string]int, len(files))
@@ -567,6 +570,7 @@ func (b *Backend) runScan(ctx context.Context, kind string, settings AppSettings
 			previous = &currentCopy
 		}
 		record := b.client.BuildAccountRecord(item, previous, timestamp)
+		record = localAuthIdentities.enrich(record)
 		record = carryInventorySnapshot(record, previous)
 		if index, ok := recordIndexes[name]; ok {
 			records[index] = record
