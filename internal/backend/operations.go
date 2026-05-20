@@ -9,6 +9,7 @@ import (
 	"io"
 	"os"
 	"slices"
+	"strings"
 	"sync"
 	"sync/atomic"
 )
@@ -132,6 +133,7 @@ func (b *Backend) ProbeAccount(name string) (AccountRecord, error) {
 		b.emitAccountActionFailure(settings.Locale, "probe", name, err)
 		return AccountRecord{}, err
 	}
+	record = b.refreshProbeRecordIdentity(context.Background(), settings, record)
 
 	probed := b.client.ProbeUsage(context.Background(), settings, record, b.probeRetryLogger(settings.DetailedLogs, "scan", settings.Locale))
 	if err := b.store.UpsertCurrentAccount(probed); err != nil {
@@ -141,6 +143,33 @@ func (b *Backend) ProbeAccount(name string) (AccountRecord, error) {
 	b.emitAccountUpdate("probe", false, probed)
 	b.emitLog("scan", "info", msg(settings.Locale, "task.scan.single_probe", probed.Name, stateLabel(settings.Locale, probed.StateKey)))
 	return probed, nil
+}
+
+func (b *Backend) refreshProbeRecordIdentity(ctx context.Context, settings AppSettings, record AccountRecord) AccountRecord {
+	if strings.TrimSpace(record.ChatGPTAccountID) != "" {
+		return record
+	}
+	files, err := b.client.FetchAuthFiles(ctx, settings)
+	if err != nil {
+		return record
+	}
+	normalizedName := normalizeManagedAccountName(record.Name)
+	recordEmail := strings.ToLower(strings.TrimSpace(record.Email))
+	for _, item := range files {
+		itemName := strings.TrimSpace(stringValue(item["name"]))
+		if itemName == "" {
+			continue
+		}
+		nameMatches := itemName == record.Name || normalizeManagedAccountName(itemName) == normalizedName
+		emailMatches := recordEmail != "" && strings.EqualFold(strings.TrimSpace(stringValue(item["email"])), recordEmail)
+		if !nameMatches && !emailMatches {
+			continue
+		}
+		previous := record
+		refreshed := b.client.BuildAccountRecord(item, &previous, nowISO())
+		return carryProbeSnapshot(refreshed, previous)
+	}
+	return record
 }
 
 func (b *Backend) ProbeAccounts(names []string) (BulkAccountActionResult, error) {
