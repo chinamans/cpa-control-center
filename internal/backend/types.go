@@ -27,6 +27,7 @@ type AppSettings struct {
 	QuotaValueByPlan        QuotaValueByPlan `json:"quotaValueByPlan"`
 	QuotaAutoRefreshEnabled bool             `json:"quotaAutoRefreshEnabled"`
 	QuotaAutoRefreshCron    string           `json:"quotaAutoRefreshCron"`
+	Invalid401Action        string           `json:"invalid401Action"`
 	Delete401               bool             `json:"delete401"`
 	AutoReenable            bool             `json:"autoReenable"`
 	ExportDirectory         string           `json:"exportDirectory"`
@@ -200,16 +201,18 @@ type InventorySyncResult struct {
 }
 
 type MaintainOptions struct {
-	Delete401    bool   `json:"delete401"`
-	QuotaAction  string `json:"quotaAction"`
-	AutoReenable bool   `json:"autoReenable"`
+	Invalid401Action string `json:"invalid401Action"`
+	Delete401        bool   `json:"delete401"`
+	QuotaAction      string `json:"quotaAction"`
+	AutoReenable     bool   `json:"autoReenable"`
 }
 
 type MaintainResult struct {
-	Scan               ScanSummary    `json:"scan"`
-	Delete401Results   []ActionResult `json:"delete401Results"`
-	QuotaActionResults []ActionResult `json:"quotaActionResults"`
-	ReenableResults    []ActionResult `json:"reenableResults"`
+	Scan                    ScanSummary    `json:"scan"`
+	Invalid401ActionResults []ActionResult `json:"invalid401ActionResults"`
+	Delete401Results        []ActionResult `json:"delete401Results"`
+	QuotaActionResults      []ActionResult `json:"quotaActionResults"`
+	ReenableResults         []ActionResult `json:"reenableResults"`
 }
 
 type ActionResult struct {
@@ -268,6 +271,7 @@ type ScanSummary struct {
 	QuotaWeeklyLimitedCount int    `json:"quotaWeeklyLimitedCount"`
 	RecoveredCount          int    `json:"recoveredCount"`
 	ErrorCount              int    `json:"errorCount"`
+	Invalid401Action        string `json:"invalid401Action"`
 	Delete401               bool   `json:"delete401"`
 	QuotaAction             string `json:"quotaAction"`
 	AutoReenable            bool   `json:"autoReenable"`

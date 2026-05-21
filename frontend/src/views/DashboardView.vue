@@ -101,8 +101,10 @@ async function runScan() {
 
 async function runMaintain() {
   const settings = settingsStore.settings
+  const invalid401Action = settings.invalid401Action || (settings.delete401 ? 'delete' : 'none')
+  const invalid401Count = invalid401Action === 'none' ? 0 : accountsStore.summary.invalid401Count
   const previewLines = [
-    t('dashboard.maintainDialog.delete401', { count: settings.delete401 ? accountsStore.summary.invalid401Count : 0 }),
+    t('dashboard.maintainDialog.invalid401Action', { action: quotaActionLabel(invalid401Action), count: invalid401Count }),
     t('dashboard.maintainDialog.quotaAction', { action: quotaActionLabel(settings.quotaAction) }),
     t('dashboard.maintainDialog.autoReenable', { count: settings.autoReenable ? accountsStore.summary.recoveredCount : 0 }),
   ]
@@ -115,7 +117,8 @@ async function runMaintain() {
       type: 'warning',
     })
     await tasksStore.runMaintain({
-      delete401: settings.delete401,
+      invalid401Action,
+      delete401: invalid401Action === 'delete',
       quotaAction: settings.quotaAction,
       autoReenable: settings.autoReenable,
     })

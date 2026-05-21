@@ -89,6 +89,7 @@ CREATE TABLE IF NOT EXISTS scan_runs (
 	recovered_count INTEGER NOT NULL,
 	error_count INTEGER NOT NULL,
 	delete_401 INTEGER NOT NULL,
+	invalid_401_action TEXT NOT NULL DEFAULT '',
 	quota_action TEXT NOT NULL,
 	auto_reenable INTEGER NOT NULL,
 	probe_workers INTEGER NOT NULL,
@@ -132,6 +133,7 @@ CREATE TABLE IF NOT EXISTS quota_snapshots (
 		{table: "accounts_current", column: "probe_error_text", definition: "TEXT NOT NULL DEFAULT ''"},
 		{table: "scan_runs", column: "quota_5h_limited_count", definition: "INTEGER NOT NULL DEFAULT 0"},
 		{table: "scan_runs", column: "quota_weekly_limited_count", definition: "INTEGER NOT NULL DEFAULT 0"},
+		{table: "scan_runs", column: "invalid_401_action", definition: "TEXT NOT NULL DEFAULT ''"},
 	} {
 		if err := s.ensureColumn(migration.table, migration.column, migration.definition); err != nil {
 			return err
@@ -223,6 +225,16 @@ func (s *Store) LoadSettings() (AppSettings, error) {
 	}
 	if _, ok := keys["quotaAutoRefreshCron"]; !ok {
 		raw.QuotaAutoRefreshCron = defaults.QuotaAutoRefreshCron
+	}
+	if _, ok := keys["delete401"]; !ok {
+		raw.Delete401 = defaults.Delete401
+	}
+	if _, ok := keys["invalid401Action"]; !ok {
+		if raw.Delete401 {
+			raw.Invalid401Action = "delete"
+		} else {
+			raw.Invalid401Action = "none"
+		}
 	}
 
 	return normalizeSettings(raw, s.exportsDir), nil
@@ -536,13 +548,14 @@ func (s *Store) StartScanRun(settings AppSettings) (int64, error) {
 		`INSERT INTO scan_runs (
 			status, started_at, finished_at, total_accounts, filtered_accounts, probed_accounts, normal_count,
 			invalid_401_count, quota_limited_count, quota_5h_limited_count, quota_weekly_limited_count,
-			recovered_count, error_count, delete_401, quota_action, auto_reenable, probe_workers,
+			recovered_count, error_count, delete_401, invalid_401_action, quota_action, auto_reenable, probe_workers,
 			action_workers, timeout_seconds, retries, message
-		) VALUES (?, ?, ?, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, ?, ?, ?, ?, ?, ?, ?, ?)`,
+		) VALUES (?, ?, ?, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
 		"running",
 		nowISO(),
 		"",
 		boolToInt(settings.Delete401),
+		settings.Invalid401Action,
 		settings.QuotaAction,
 		boolToInt(settings.AutoReenable),
 		settings.ProbeWorkers,
@@ -573,6 +586,7 @@ func (s *Store) FinishScanRun(summary ScanSummary) error {
 			recovered_count = ?,
 			error_count = ?,
 			delete_401 = ?,
+			invalid_401_action = ?,
 			quota_action = ?,
 			auto_reenable = ?,
 			probe_workers = ?,
@@ -594,6 +608,7 @@ func (s *Store) FinishScanRun(summary ScanSummary) error {
 		summary.RecoveredCount,
 		summary.ErrorCount,
 		boolToInt(summary.Delete401),
+		summary.Invalid401Action,
 		summary.QuotaAction,
 		boolToInt(summary.AutoReenable),
 		summary.ProbeWorkers,
@@ -732,7 +747,7 @@ func (s *Store) ListScanHistory(limit int) ([]ScanSummary, error) {
 	rows, err := s.db.Query(
 		`SELECT run_id, status, started_at, finished_at, total_accounts, filtered_accounts, probed_accounts,
 		        normal_count, invalid_401_count, quota_limited_count, quota_5h_limited_count,
-		        quota_weekly_limited_count, recovered_count, error_count, delete_401,
+		        quota_weekly_limited_count, recovered_count, error_count, delete_401, invalid_401_action,
 		        quota_action, auto_reenable, probe_workers, action_workers, timeout_seconds, retries, message
 		   FROM scan_runs
 		  ORDER BY run_id DESC
@@ -765,6 +780,7 @@ func (s *Store) ListScanHistory(limit int) ([]ScanSummary, error) {
 			&item.RecoveredCount,
 			&item.ErrorCount,
 			&delete401,
+			&item.Invalid401Action,
 			&item.QuotaAction,
 			&autoReenable,
 			&item.ProbeWorkers,
@@ -776,6 +792,7 @@ func (s *Store) ListScanHistory(limit int) ([]ScanSummary, error) {
 			return nil, err
 		}
 		item.Delete401 = delete401 == 1
+		item.Invalid401Action = legacyInvalid401Action(item.Invalid401Action, item.Delete401)
 		item.AutoReenable = autoReenable == 1
 		items = append(items, item)
 	}
@@ -877,7 +894,7 @@ func (s *Store) scanSummaryByRunID(runID int64) (ScanSummary, error) {
 	err := s.db.QueryRow(
 		`SELECT run_id, status, started_at, finished_at, total_accounts, filtered_accounts, probed_accounts,
 		        normal_count, invalid_401_count, quota_limited_count, quota_5h_limited_count,
-		        quota_weekly_limited_count, recovered_count, error_count, delete_401,
+		        quota_weekly_limited_count, recovered_count, error_count, delete_401, invalid_401_action,
 		        quota_action, auto_reenable, probe_workers, action_workers, timeout_seconds, retries, message
 		   FROM scan_runs
 		  WHERE run_id = ?`,
@@ -898,6 +915,7 @@ func (s *Store) scanSummaryByRunID(runID int64) (ScanSummary, error) {
 		&summary.RecoveredCount,
 		&summary.ErrorCount,
 		&delete401,
+		&summary.Invalid401Action,
 		&summary.QuotaAction,
 		&autoReenable,
 		&summary.ProbeWorkers,
@@ -910,6 +928,7 @@ func (s *Store) scanSummaryByRunID(runID int64) (ScanSummary, error) {
 		return summary, err
 	}
 	summary.Delete401 = delete401 == 1
+	summary.Invalid401Action = legacyInvalid401Action(summary.Invalid401Action, summary.Delete401)
 	summary.AutoReenable = autoReenable == 1
 	return summary, nil
 }
@@ -1050,4 +1069,14 @@ func boolToInt(value bool) int {
 		return 1
 	}
 	return 0
+}
+
+func legacyInvalid401Action(action string, delete401 bool) string {
+	if normalized := normalizeInvalid401Action(action); normalized != "" {
+		return normalized
+	}
+	if delete401 {
+		return "delete"
+	}
+	return "none"
 }

@@ -40,6 +40,7 @@ export interface AppSettings {
   quotaValueByPlan: QuotaValueByPlan
   quotaAutoRefreshEnabled: boolean
   quotaAutoRefreshCron: string
+  invalid401Action: string
   delete401: boolean
   autoReenable: boolean
   exportDirectory: string
@@ -218,6 +219,7 @@ export interface InventorySyncResult {
 }
 
 export interface MaintainOptions {
+  invalid401Action: string
   delete401: boolean
   quotaAction: string
   autoReenable: boolean
@@ -273,6 +275,7 @@ export interface ScanSummary {
   quotaWeeklyLimitedCount: number
   recoveredCount: number
   errorCount: number
+  invalid401Action: string
   delete401: boolean
   quotaAction: string
   autoReenable: boolean
@@ -298,6 +301,7 @@ export interface ScanDetailPage {
 
 export interface MaintainResult {
   scan: ScanSummary
+  invalid401ActionResults: ActionResult[]
   delete401Results: ActionResult[]
   quotaActionResults: ActionResult[]
   reenableResults: ActionResult[]

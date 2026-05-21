@@ -47,7 +47,14 @@ func (b *Backend) RunMaintain(options MaintainOptions) (MaintainResult, error) {
 		return MaintainResult{}, err
 	}
 
-	settings.Delete401 = options.Delete401
+	if normalized := normalizeInvalid401Action(options.Invalid401Action); normalized != "" {
+		settings.Invalid401Action = normalized
+	} else if options.Delete401 {
+		settings.Invalid401Action = "delete"
+	} else {
+		settings.Invalid401Action = "none"
+	}
+	settings.Delete401 = settings.Invalid401Action == "delete"
 	if options.QuotaAction == "disable" || options.QuotaAction == "delete" {
 		settings.QuotaAction = options.QuotaAction
 	}
@@ -514,16 +521,17 @@ func (b *Backend) runScan(ctx context.Context, kind string, settings AppSettings
 	}
 
 	summary := ScanSummary{
-		RunID:          runID,
-		Status:         "running",
-		StartedAt:      nowISO(),
-		Delete401:      settings.Delete401,
-		QuotaAction:    settings.QuotaAction,
-		AutoReenable:   settings.AutoReenable,
-		ProbeWorkers:   settings.ProbeWorkers,
-		ActionWorkers:  settings.ActionWorkers,
-		TimeoutSeconds: settings.TimeoutSeconds,
-		Retries:        settings.Retries,
+		RunID:            runID,
+		Status:           "running",
+		StartedAt:        nowISO(),
+		Invalid401Action: settings.Invalid401Action,
+		Delete401:        settings.Delete401,
+		QuotaAction:      settings.QuotaAction,
+		AutoReenable:     settings.AutoReenable,
+		ProbeWorkers:     settings.ProbeWorkers,
+		ActionWorkers:    settings.ActionWorkers,
+		TimeoutSeconds:   settings.TimeoutSeconds,
+		Retries:          settings.Retries,
 	}
 
 	var records []AccountRecord
@@ -704,16 +712,38 @@ func (b *Backend) runMaintain(ctx context.Context, settings AppSettings) (Mainta
 		}
 	}
 
-	if settings.Delete401 && len(invalid) > 0 {
-		names := namesFromRecords(invalid)
-		b.emitLog("maintain", "info", msg(settings.Locale, "task.maintain.delete_invalid", len(names)))
-		result.Delete401Results, err = b.runActionGroup(ctx, "maintain", "delete401", "delete", settings.Locale, settings.DetailedLogs, names, settings.ActionWorkers, func(actionCtx context.Context, name string) ActionResult {
-			return b.client.DeleteAccount(actionCtx, settings, name)
-		})
-		if err != nil {
-			return result, err
+	switch settings.Invalid401Action {
+	case "disable":
+		var toDisable []string
+		for _, record := range invalid {
+			if record.Disabled {
+				continue
+			}
+			toDisable = append(toDisable, record.Name)
 		}
-		applyDeleteResults(recordMap, result.Delete401Results, "delete_401", "deleted_401")
+		if len(toDisable) > 0 {
+			b.emitLog("maintain", "info", msg(settings.Locale, "task.maintain.disable_invalid", len(toDisable)))
+			result.Invalid401ActionResults, err = b.runActionGroup(ctx, "maintain", "invalid401", "disable", settings.Locale, settings.DetailedLogs, toDisable, settings.ActionWorkers, func(actionCtx context.Context, name string) ActionResult {
+				return b.client.SetAccountDisabled(actionCtx, settings, name, true)
+			})
+			if err != nil {
+				return result, err
+			}
+			applyDisableResults(recordMap, result.Invalid401ActionResults, "disable_401", "invalid_401_disabled", true)
+		}
+	case "delete":
+		if len(invalid) > 0 {
+			names := namesFromRecords(invalid)
+			b.emitLog("maintain", "info", msg(settings.Locale, "task.maintain.delete_invalid", len(names)))
+			result.Invalid401ActionResults, err = b.runActionGroup(ctx, "maintain", "invalid401", "delete", settings.Locale, settings.DetailedLogs, names, settings.ActionWorkers, func(actionCtx context.Context, name string) ActionResult {
+				return b.client.DeleteAccount(actionCtx, settings, name)
+			})
+			if err != nil {
+				return result, err
+			}
+			result.Delete401Results = result.Invalid401ActionResults
+			applyDeleteResults(recordMap, result.Invalid401ActionResults, "delete_401", "deleted_401")
+		}
 	}
 
 	deletedNames := successfulNames(result.Delete401Results)

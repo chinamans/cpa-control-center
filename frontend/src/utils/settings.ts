@@ -72,6 +72,7 @@ export function createDefaultSettings(): AppSettings {
     quotaValueByPlan: createDefaultQuotaValueByPlan(),
     quotaAutoRefreshEnabled: false,
     quotaAutoRefreshCron: '',
+    invalid401Action: 'delete',
     delete401: true,
     autoReenable: true,
     exportDirectory: '',
@@ -115,6 +116,9 @@ export function validateSettings(settings: AppSettings, t: Translate = fallbackT
   }
   if (!['disable', 'delete'].includes(settings.quotaAction)) {
     errors.quotaAction = t('validation.quotaActionInvalid')
+  }
+  if (!['none', 'disable', 'delete'].includes(settings.invalid401Action)) {
+    errors.invalid401Action = t('validation.invalid401ActionInvalid')
   }
   if (settings.quotaFreeMaxAccounts < -1) {
     errors.quotaFreeMaxAccounts = t('validation.quotaFreeMaxAccountsMin')

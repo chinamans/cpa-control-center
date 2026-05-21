@@ -15,19 +15,20 @@ func TestStoreSettingsAndHistory(t *testing.T) {
 	defer store.Close()
 
 	settings, err := store.SaveSettings(AppSettings{
-		BaseURL:         "https://example.com",
-		ManagementToken: "token",
-		Locale:          localeEnglish,
-		DetailedLogs:    true,
-		TargetType:      "codex",
-		ProbeWorkers:    12,
-		ActionWorkers:   6,
-		TimeoutSeconds:  10,
-		Retries:         2,
-		QuotaAction:     "disable",
-		Delete401:       true,
-		AutoReenable:    true,
-		ExportDirectory: store.exportsDir,
+		BaseURL:          "https://example.com",
+		ManagementToken:  "token",
+		Locale:           localeEnglish,
+		DetailedLogs:     true,
+		TargetType:       "codex",
+		ProbeWorkers:     12,
+		ActionWorkers:    6,
+		TimeoutSeconds:   10,
+		Retries:          2,
+		QuotaAction:      "disable",
+		Invalid401Action: "delete",
+		Delete401:        true,
+		AutoReenable:     true,
+		ExportDirectory:  store.exportsDir,
 	})
 	if err != nil {
 		t.Fatalf("SaveSettings: %v", err)
@@ -45,6 +46,9 @@ func TestStoreSettingsAndHistory(t *testing.T) {
 	}
 	if !loaded.DetailedLogs {
 		t.Fatalf("expected detailed logs to persist")
+	}
+	if loaded.Invalid401Action != "delete" || !loaded.Delete401 {
+		t.Fatalf("expected invalid 401 action to persist as delete, got action=%q delete401=%v", loaded.Invalid401Action, loaded.Delete401)
 	}
 
 	records := []AccountRecord{
@@ -197,6 +201,7 @@ func TestStoreSettingsAndHistory(t *testing.T) {
 		QuotaLimitedCount: 0,
 		RecoveredCount:    0,
 		ErrorCount:        0,
+		Invalid401Action:  "delete",
 		Delete401:         true,
 		QuotaAction:       "disable",
 		AutoReenable:      true,
@@ -219,6 +224,9 @@ func TestStoreSettingsAndHistory(t *testing.T) {
 	}
 	if len(history) != 1 || history[0].RunID != runID {
 		t.Fatalf("unexpected history: %+v", history)
+	}
+	if history[0].Invalid401Action != "delete" {
+		t.Fatalf("unexpected history 401 action: %+v", history[0])
 	}
 
 	detail, err := store.GetScanDetails(runID)
@@ -323,6 +331,9 @@ func TestLoadSettingsDefaultsSkipKnown401WhenMissingFromLegacyFile(t *testing.T)
 	}
 	if !settings.SkipKnown401 {
 		t.Fatalf("expected legacy settings to default skipKnown401 to true")
+	}
+	if settings.Invalid401Action != "delete" || !settings.Delete401 {
+		t.Fatalf("expected legacy delete401 to map to delete action, got action=%q delete401=%v", settings.Invalid401Action, settings.Delete401)
 	}
 }
 

@@ -34,6 +34,14 @@ function createDefaultSchedulerStatus(): SchedulerStatus {
   }
 }
 
+function normalizeInvalid401Action(action: unknown, delete401: unknown): string {
+  const value = String(action ?? '').trim().toLowerCase()
+  if (['none', 'disable', 'delete'].includes(value)) {
+    return value
+  }
+  return delete401 === false ? 'none' : 'delete'
+}
+
 export const useSettingsStore = defineStore('settingsStore', {
   state: (): SettingsState => ({
     settings: createDefaultSettings(),
@@ -54,13 +62,16 @@ export const useSettingsStore = defineStore('settingsStore', {
     currentLocale: (state) => normalizeLocaleCode(state.settings.locale || i18n.global.locale.value),
   },
   actions: {
-	    mergeSettings(result: Partial<AppSettings>) {
-	      const defaults = createDefaultSettings()
-	      this.settings = {
-	        ...defaults,
-	        ...result,
-	        quotaValueByPlan: normalizeQuotaValueByPlan(result.quotaValueByPlan ?? defaults.quotaValueByPlan),
-	        schedule: {
+    mergeSettings(result: Partial<AppSettings>) {
+      const defaults = createDefaultSettings()
+      const invalid401Action = normalizeInvalid401Action(result.invalid401Action, result.delete401 ?? defaults.delete401)
+      this.settings = {
+        ...defaults,
+        ...result,
+        invalid401Action,
+        delete401: invalid401Action === 'delete',
+        quotaValueByPlan: normalizeQuotaValueByPlan(result.quotaValueByPlan ?? defaults.quotaValueByPlan),
+        schedule: {
 	          ...createDefaultScheduleSettings(),
 	          ...(result.schedule ?? {}),
         },

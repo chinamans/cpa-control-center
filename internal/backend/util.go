@@ -20,6 +20,7 @@ const (
 	defaultTimeout              = 15
 	defaultRetries              = 3
 	defaultQuotaAction          = "disable"
+	defaultInvalid401Action     = "delete"
 	defaultQuotaFreeMaxAccounts = 100
 	defaultScheduleMode         = "scan"
 	defaultUserAgent            = "codex_cli_rs/0.76.0 (Debian 13.0.0; x86_64) WindowsTerminal"
@@ -54,6 +55,7 @@ func defaultSettings(exportDir string) AppSettings {
 		QuotaValueByPlan:        defaultQuotaValueByPlan(),
 		QuotaAutoRefreshEnabled: false,
 		QuotaAutoRefreshCron:    "",
+		Invalid401Action:        defaultInvalid401Action,
 		Delete401:               true,
 		AutoReenable:            true,
 		ExportDirectory:         exportDir,
@@ -124,7 +126,14 @@ func normalizeSettings(input AppSettings, exportDir string) AppSettings {
 	settings.QuotaValueByPlan = normalizeQuotaValueByPlan(input.QuotaValueByPlan)
 	settings.QuotaAutoRefreshEnabled = input.QuotaAutoRefreshEnabled
 	settings.QuotaAutoRefreshCron = strings.TrimSpace(input.QuotaAutoRefreshCron)
-	settings.Delete401 = input.Delete401
+	if normalized := normalizeInvalid401Action(input.Invalid401Action); normalized != "" {
+		settings.Invalid401Action = normalized
+	} else if input.Delete401 {
+		settings.Invalid401Action = "delete"
+	} else {
+		settings.Invalid401Action = "none"
+	}
+	settings.Delete401 = settings.Invalid401Action == "delete"
 	settings.AutoReenable = input.AutoReenable
 	if trimmed := strings.TrimSpace(input.ExportDirectory); trimmed != "" {
 		settings.ExportDirectory = trimmed
@@ -187,6 +196,15 @@ func normalizeScheduleMode(mode string) string {
 		return "maintain"
 	default:
 		return defaultScheduleMode
+	}
+}
+
+func normalizeInvalid401Action(action string) string {
+	switch strings.ToLower(strings.TrimSpace(action)) {
+	case "none", "disable", "delete":
+		return strings.ToLower(strings.TrimSpace(action))
+	default:
+		return ""
 	}
 }
 
@@ -481,7 +499,7 @@ func settingsSummary(locale string, settings AppSettings) string {
 		settings.TimeoutSeconds,
 		settings.Retries,
 		settings.QuotaAction,
-		boolLabel(locale, settings.Delete401),
+		settings.Invalid401Action,
 		boolLabel(locale, settings.AutoReenable),
 	)
 }

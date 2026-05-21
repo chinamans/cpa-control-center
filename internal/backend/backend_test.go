@@ -1283,6 +1283,81 @@ func TestBackendMaintainDisablesUsageLimit401Accounts(t *testing.T) {
 	}
 }
 
+func TestBackendMaintainCanDisableInvalid401Accounts(t *testing.T) {
+	serverState := &fakeCPAServer{
+		files: []map[string]any{
+			{
+				"name":       "invalid-codex.json",
+				"type":       "codex",
+				"provider":   "codex",
+				"auth_index": "invalid",
+				"id_token":   `{"chatgpt_account_id":"acct-invalid","plan_type":"pro"}`,
+			},
+		},
+	}
+
+	server := httptest.NewServer(http.HandlerFunc(serverState.handler))
+	defer server.Close()
+
+	dataDir := t.TempDir()
+	service, err := New(dataDir, nil)
+	if err != nil {
+		t.Fatalf("New backend: %v", err)
+	}
+	defer service.Close()
+
+	_, err = service.SaveSettings(AppSettings{
+		BaseURL:          server.URL,
+		ManagementToken:  "token",
+		Locale:           localeEnglish,
+		TargetType:       "codex",
+		ProbeWorkers:     1,
+		ActionWorkers:    1,
+		TimeoutSeconds:   5,
+		Retries:          0,
+		UserAgent:        defaultUserAgent,
+		QuotaAction:      "disable",
+		Invalid401Action: "disable",
+	})
+	if err != nil {
+		t.Fatalf("SaveSettings: %v", err)
+	}
+
+	result, err := service.RunMaintain(MaintainOptions{
+		Invalid401Action: "disable",
+		QuotaAction:      "disable",
+	})
+	if err != nil {
+		t.Fatalf("RunMaintain: %v", err)
+	}
+	if len(result.Invalid401ActionResults) != 1 || !result.Invalid401ActionResults[0].OK || !boolValue(result.Invalid401ActionResults[0].Disabled) {
+		t.Fatalf("expected invalid 401 account to be disabled, got %+v", result.Invalid401ActionResults)
+	}
+	if len(result.Delete401Results) != 0 {
+		t.Fatalf("invalid 401 disable action should not populate delete results: %+v", result.Delete401Results)
+	}
+
+	records, err := service.ListAccounts(AccountFilter{Type: "codex"})
+	if err != nil {
+		t.Fatalf("ListAccounts: %v", err)
+	}
+	if len(records) != 1 {
+		t.Fatalf("expected one retained record, got %d", len(records))
+	}
+	if records[0].StateKey != stateInvalid401 || !records[0].Disabled || records[0].ManagedReason != "invalid_401_disabled" || records[0].LastAction != "disable_401" {
+		t.Fatalf("expected disabled invalid 401 record, got %+v", records[0])
+	}
+
+	serverState.mu.Lock()
+	defer serverState.mu.Unlock()
+	if len(serverState.deleted) != 0 {
+		t.Fatalf("expected no deletes, got %+v", serverState.deleted)
+	}
+	if len(serverState.disabled) != 1 || serverState.disabled[0] != "invalid-codex.json" {
+		t.Fatalf("expected invalid-codex.json to be disabled, got %+v", serverState.disabled)
+	}
+}
+
 func TestBackendBatchAccountActions(t *testing.T) {
 	serverState := &fakeCPAServer{
 		files: []map[string]any{

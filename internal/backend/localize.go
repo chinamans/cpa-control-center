@@ -25,7 +25,7 @@ var translations = map[string]map[string]string{
 	localeEnglish: {
 		"common.yes":                       "yes",
 		"common.no":                        "no",
-		"settings.summary":                 "type=%s provider=%s scan=%s batch=%d probe workers=%d action workers=%d timeout=%ds retries=%d quota action=%s delete 401=%s auto re-enable=%s",
+		"settings.summary":                 "type=%s provider=%s scan=%s batch=%d probe workers=%d action workers=%d timeout=%ds retries=%d quota action=%s 401 action=%s auto re-enable=%s",
 		"settings.saved":                   "Saved settings for %s",
 		"connection.success":               "Connection successful.",
 		"task.inventory.synced":            "Synced %d filtered accounts from %d inventory records.",
@@ -66,6 +66,7 @@ var translations = map[string]map[string]string{
 		"task.schedule.skipped_active":     "Scheduled %s skipped because %s is already running",
 		"task.schedule.completed":          "Scheduled %s completed",
 		"task.schedule.failed":             "Scheduled %s failed: %v",
+		"task.maintain.disable_invalid":    "Disabling %d 401-invalid accounts",
 		"task.maintain.delete_invalid":     "Deleting %d invalid accounts",
 		"task.maintain.disable_quota":      "Disabling %d weekly quota-limited accounts",
 		"task.maintain.delete_quota":       "Deleting %d weekly quota-limited accounts",
@@ -124,7 +125,7 @@ var translations = map[string]map[string]string{
 	localeChinese: {
 		"common.yes":                       "是",
 		"common.no":                        "否",
-		"settings.summary":                 "类型=%s 提供方=%s 扫描策略=%s 批次=%d 探测并发=%d 动作并发=%d 超时=%d秒 重试=%d 限额动作=%s 删除401=%s 自动恢复=%s",
+		"settings.summary":                 "类型=%s 提供方=%s 扫描策略=%s 批次=%d 探测并发=%d 动作并发=%d 超时=%d秒 重试=%d 限额动作=%s 401动作=%s 自动恢复=%s",
 		"settings.saved":                   "已保存 %s 的设置",
 		"connection.success":               "连接成功。",
 		"task.inventory.synced":            "已同步库存：%d 个过滤后账号，来自 %d 条清单记录。",
@@ -165,6 +166,7 @@ var translations = map[string]map[string]string{
 		"task.schedule.skipped_active":     "定时%s已跳过，因为%s正在执行",
 		"task.schedule.completed":          "定时%s已完成",
 		"task.schedule.failed":             "定时%s执行失败：%v",
+		"task.maintain.disable_invalid":    "正在禁用 %d 个 401 失效账号",
 		"task.maintain.delete_invalid":     "正在删除 %d 个失效账号",
 		"task.maintain.disable_quota":      "正在禁用 %d 个周额度用尽账号",
 		"task.maintain.delete_quota":       "正在删除 %d 个周额度用尽账号",

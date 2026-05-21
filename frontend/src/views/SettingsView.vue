@@ -41,6 +41,7 @@ const infoCopy = computed<Record<string, string>>(() => (
         timeoutSeconds: '单次请求的超时时间。数值越大越能容忍慢响应，但上游异常时 worker 会被占用更久。',
         retries: '可重试探测错误的额外尝试次数。数值越大越稳，但也会放大总请求量。',
         quotaAction: '扫描后遇到周额度用尽账号时，维护流程要执行的动作。5小时额度用尽账号不会被这个动作处理。',
+        invalid401Action: '维护流程遇到 401 失效账号时要执行的动作。选择禁用会保留账号文件，选择删除会从 CPA 中移除。',
         quotaFreeMaxAccounts: '限制 free 套餐最多查询多少个账号的额度。填 -1 表示不限数量。',
 	        quotaPlanToggles: '只有开启的套餐会在 Codex 额度页中被查询和展示。默认关闭 free，避免浪费请求。',
 	        quotaValueByPlan: '把额度页的累计剩余百分比换算成金额。计算方式：累计剩余百分比 ÷ 100 × 当前套餐配置额度。',
@@ -58,6 +59,7 @@ const infoCopy = computed<Record<string, string>>(() => (
         timeoutSeconds: 'Per-request timeout in seconds. Higher values tolerate slower responses, but workers stay occupied longer when upstream is unhealthy.',
         retries: 'Extra attempts for retryable probe failures. Higher values improve resilience, but they multiply total request volume.',
         quotaAction: 'What maintenance should do with weekly quota-limited accounts after scanning. 5-hour quota-limited accounts are left untouched.',
+        invalid401Action: 'What maintenance should do with 401-invalid accounts. Disable keeps the auth file; delete removes it from CPA.',
         quotaFreeMaxAccounts: 'Limits how many free accounts can be queried on the quota page. Use -1 for unlimited.',
 	        quotaPlanToggles: 'Only enabled plans are queried and shown on the Codex quota page. Free is off by default to avoid wasting calls.',
 	        quotaValueByPlan: 'Converts quota-page pooled remaining percentage into value. Formula: total remaining percent / 100 x the configured plan quota.',
@@ -322,6 +324,27 @@ async function changeLocale(locale: string) {
           <el-form-item :label="t('settings.exportDirectory')">
             <el-input v-model="settingsStore.settings.exportDirectory" />
           </el-form-item>
+          <el-form-item :error="settingsStore.errors.invalid401Action">
+            <template #label>
+              <span class="form-label-with-info">
+                <span>{{ t('settings.invalid401Action') }}</span>
+                <el-popover trigger="click" placement="top-start" :width="320" popper-class="settings-info-popover">
+                  <template #reference>
+                    <button type="button" class="info-trigger" :aria-label="infoAriaLabel">i</button>
+                  </template>
+                  <div class="settings-info-popover__content">
+                    <strong>{{ t('settings.invalid401Action') }}</strong>
+                    <p>{{ infoText('invalid401Action') }}</p>
+                  </div>
+                </el-popover>
+              </span>
+            </template>
+            <el-select v-model="settingsStore.settings.invalid401Action">
+              <el-option :label="t('quotaActions.none')" value="none" />
+              <el-option :label="t('quotaActions.disable')" value="disable" />
+              <el-option :label="t('quotaActions.delete')" value="delete" />
+            </el-select>
+          </el-form-item>
           <el-form-item :label="t('settings.userAgent')" class="span-2">
             <el-input v-model="settingsStore.settings.userAgent" />
           </el-form-item>
@@ -332,7 +355,6 @@ async function changeLocale(locale: string) {
 
         <div class="settings-toggles">
           <el-switch v-model="settingsStore.settings.skipKnown401" :active-text="t('settings.skipKnown401')" />
-          <el-switch v-model="settingsStore.settings.delete401" :active-text="t('settings.delete401')" />
           <el-switch v-model="settingsStore.settings.autoReenable" :active-text="t('settings.autoReenable')" />
           <el-switch v-model="settingsStore.settings.detailedLogs" :active-text="t('settings.detailedLogs')" />
         </div>
