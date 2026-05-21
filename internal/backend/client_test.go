@@ -589,3 +589,105 @@ func TestClientProbeTreatsDoubleEncodedUsageLimit401AsQuotaLimited(t *testing.T)
 		t.Fatalf("expected 1 probe attempt, got %d", hits)
 	}
 }
+
+func TestClientPreservesPreviousPlanTypeFor401QuotaSnapshot(t *testing.T) {
+	t.Parallel()
+
+	server := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		switch {
+		case r.Method == http.MethodPost && r.URL.Path == "/v0/management/api-call":
+			_ = json.NewEncoder(w).Encode(map[string]any{
+				"status_code": 401,
+				"body":        `{}`,
+			})
+		default:
+			http.NotFound(w, r)
+		}
+	}))
+	defer server.Close()
+
+	client := NewClient()
+	previous := AccountRecord{
+		Name:             "stale-plan.json",
+		AuthIndex:        "stale-plan",
+		Type:             "codex",
+		Provider:         "codex",
+		PlanType:         "plus",
+		ChatGPTAccountID: "acct-stale-plan",
+		State:            stateNormal,
+		StateKey:         stateNormal,
+		LastProbedAt:     nowISO(),
+		AuthUpdatedAt:    "2026-05-20T01:00:00Z",
+	}
+	inventory := map[string]any{
+		"name":       "stale-plan.json",
+		"type":       "codex",
+		"provider":   "codex",
+		"auth_index": "stale-plan",
+		"updated_at": "2026-05-21T01:00:00Z",
+		"id_token":   map[string]any{"chatgpt_account_id": "acct-stale-plan"},
+	}
+
+	record := client.BuildAccountRecord(inventory, &previous, nowISO())
+	record = carryInventorySnapshot(record, &previous)
+	if record.PlanType != "plus" {
+		t.Fatalf("expected inventory refresh to preserve previous plan type, got %+v", record)
+	}
+
+	probe := client.ProbeUsageResult(context.Background(), AppSettings{
+		BaseURL:         server.URL,
+		ManagementToken: "token",
+		Locale:          localeEnglish,
+		TimeoutSeconds:  5,
+		UserAgent:       defaultUserAgent,
+	}, record)
+	if probe.Record.StateKey != stateInvalid401 || probe.Record.PlanType != "plus" {
+		t.Fatalf("expected 401 probe to keep plus plan type, got %+v", probe.Record)
+	}
+
+	outcome := quotaOutcomeFromUsageProbe(probe)
+	detail := buildQuotaAccountDetail(outcome, nowISO())
+	if outcome.planType != "plus" || detail.PlanType != "plus" {
+		t.Fatalf("expected quota snapshot detail to remain plus, got outcome=%+v detail=%+v", outcome, detail)
+	}
+}
+
+func TestQuotaRefreshRecordsUsePreviousPlanType(t *testing.T) {
+	t.Parallel()
+
+	service, err := New(t.TempDir(), nil)
+	if err != nil {
+		t.Fatalf("New backend: %v", err)
+	}
+	defer service.Close()
+
+	existing := map[string]AccountRecord{
+		"quota-refresh-stale.json": {
+			Name:             "quota-refresh-stale.json",
+			Type:             "codex",
+			Provider:         "codex",
+			PlanType:         "plus",
+			ChatGPTAccountID: "acct-quota-refresh-stale",
+			State:            stateInvalid401,
+			StateKey:         stateInvalid401,
+			LastProbedAt:     nowISO(),
+		},
+	}
+	files := []map[string]any{
+		{
+			"name":       "quota-refresh-stale.json",
+			"type":       "codex",
+			"provider":   "codex",
+			"auth_index": "quota-refresh-stale",
+			"id_token":   map[string]any{"chatgpt_account_id": "acct-quota-refresh-stale"},
+		},
+	}
+
+	records := service.selectQuotaRecords(AppSettings{QuotaCheckPlus: true}, files, nowISO(), existing)
+	if len(records) != 1 {
+		t.Fatalf("expected one quota record, got %+v", records)
+	}
+	if records[0].PlanType != "plus" {
+		t.Fatalf("expected quota refresh to preserve previous plan type, got %+v", records[0])
+	}
+}

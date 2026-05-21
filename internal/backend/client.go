@@ -141,6 +141,12 @@ func (c *Client) BuildAccountRecord(item map[string]any, previous *AccountRecord
 		record.LastAction = previous.LastAction
 		record.LastActionStatus = previous.LastActionStatus
 		record.LastActionError = previous.LastActionError
+		if record.PlanType == "" {
+			record.PlanType = previous.PlanType
+		}
+		if record.IDTokenPlanType == "" {
+			record.IDTokenPlanType = previous.IDTokenPlanType
+		}
 	}
 	return record
 }

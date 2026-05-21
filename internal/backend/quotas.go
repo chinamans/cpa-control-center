@@ -108,7 +108,14 @@ func (b *Backend) GetCodexQuotaSnapshot() (CodexQuotaSnapshot, error) {
 	b.emitProgress("quota", "fetch", 1, 1, msg(settings.Locale, "task.scan.loaded_auth_files", len(files)), true)
 
 	timestamp := nowISO()
-	records := b.selectQuotaRecords(settings, files, timestamp)
+	existing, err := b.store.LoadCurrentMap()
+	if err != nil {
+		status = "failed"
+		finishMessage = err.Error()
+		b.emitLog("quota", "error", finishMessage)
+		return CodexQuotaSnapshot{}, err
+	}
+	records := b.selectQuotaRecords(settings, files, timestamp, existing)
 
 	if len(records) == 0 {
 		snapshot := CodexQuotaSnapshot{
@@ -154,14 +161,21 @@ func (b *Backend) GetCodexQuotaSnapshot() (CodexQuotaSnapshot, error) {
 	return snapshot, nil
 }
 
-func (b *Backend) selectQuotaRecords(settings AppSettings, files []map[string]any, timestamp string) []AccountRecord {
+func (b *Backend) selectQuotaRecords(settings AppSettings, files []map[string]any, timestamp string, existing map[string]AccountRecord) []AccountRecord {
 	records := make([]AccountRecord, 0, len(files))
 	freeSelected := 0
 	freeLimit := settings.QuotaFreeMaxAccounts
 	localAuthIdentities := loadLocalAuthIdentityIndex()
 
 	for _, item := range files {
-		record := b.buildQuotaRecord(item, timestamp)
+		var previous *AccountRecord
+		if existing != nil {
+			if current, ok := existing[stringValue(item["name"])]; ok {
+				currentCopy := current
+				previous = &currentCopy
+			}
+		}
+		record := b.buildQuotaRecord(item, previous, timestamp)
 		record = localAuthIdentities.enrich(record)
 		if record.Name == "" {
 			continue
@@ -182,8 +196,8 @@ func (b *Backend) selectQuotaRecords(settings AppSettings, files []map[string]an
 	return records
 }
 
-func (b *Backend) buildQuotaRecord(item map[string]any, timestamp string) AccountRecord {
-	record := b.client.BuildAccountRecord(item, nil, timestamp)
+func (b *Backend) buildQuotaRecord(item map[string]any, previous *AccountRecord, timestamp string) AccountRecord {
+	record := b.client.BuildAccountRecord(item, previous, timestamp)
 	if !strings.EqualFold(record.Provider, "codex") && !strings.EqualFold(record.Type, "codex") {
 		return AccountRecord{}
 	}
