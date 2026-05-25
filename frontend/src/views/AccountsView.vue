@@ -44,7 +44,7 @@ function normalizedText(value: unknown) {
   return typeof value === 'string' ? value.trim() : ''
 }
 
-const showCodexProviderFilters = computed(() => normalizedText(accountsStore.providerFilter).toLowerCase() === 'codex')
+const showCodexPlanFilter = computed(() => normalizedText(accountsStore.providerFilter).toLowerCase() === 'codex')
 const disabledFilterValue = computed({
   get: () => {
     if (accountsStore.disabledFilter === null) {
@@ -106,9 +106,6 @@ watch(
     }
     if (accountsStore.planFilter !== '') {
       accountsStore.planFilter = ''
-    }
-    if (accountsStore.disabledFilter !== null) {
-      accountsStore.disabledFilter = null
     }
   },
 )
@@ -299,7 +296,7 @@ function changePageSize(pageSize: number) {
             <el-option v-for="provider in providerOptions" :key="provider" :label="provider" :value="provider" />
           </el-select>
           <el-select
-            v-if="showCodexProviderFilters"
+            v-if="showCodexPlanFilter"
             v-model="accountsStore.planFilter"
             :placeholder="t('accounts.planPlaceholder')"
             clearable
@@ -308,7 +305,6 @@ function changePageSize(pageSize: number) {
             <el-option v-for="plan in planOptions" :key="plan" :label="planPillLabel(plan)" :value="plan" />
           </el-select>
           <el-select
-            v-if="showCodexProviderFilters"
             v-model="disabledFilterValue"
             :placeholder="t('accounts.disabledPlaceholder')"
             clearable
