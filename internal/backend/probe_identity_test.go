@@ -171,3 +171,84 @@ func TestProbeAccountRefreshesMissingChatGPTAccountIDFromLocalAuthFile(t *testin
 		t.Fatalf("expected successful probe after local auth refresh, got %+v", probed)
 	}
 }
+
+func TestProbeAccountRefreshesMissingChatGPTAccountIDFromLocalAuthFileByAuthIndex(t *testing.T) {
+	serverState := &fakeCPAServer{
+		files: []map[string]any{
+			{
+				"name":       "server-returned-name.json",
+				"type":       "codex",
+				"provider":   "codex",
+				"auth_index": "healthy-auth-index",
+				"id_token":   "",
+			},
+		},
+	}
+
+	server := httptest.NewServer(http.HandlerFunc(serverState.handler))
+	defer server.Close()
+
+	dataDir := t.TempDir()
+	authDir := t.TempDir()
+	t.Setenv(authFilesDirEnv, authDir)
+	if err := os.WriteFile(filepath.Join(authDir, "healthy-auth-index.json"), []byte(`{
+		"email": "index-match@example.com",
+		"account_id": "acct-from-auth-index-file",
+		"id_token": ""
+	}`), 0o644); err != nil {
+		t.Fatalf("WriteFile: %v", err)
+	}
+
+	service, err := New(dataDir, nil)
+	if err != nil {
+		t.Fatalf("New backend: %v", err)
+	}
+	defer service.Close()
+
+	_, err = service.SaveSettings(AppSettings{
+		BaseURL:         server.URL,
+		ManagementToken: "token",
+		Locale:          localeEnglish,
+		TargetType:      "codex",
+		ProbeWorkers:    4,
+		ActionWorkers:   2,
+		TimeoutSeconds:  5,
+		Retries:         0,
+		UserAgent:       defaultUserAgent,
+		QuotaAction:     "disable",
+		ExportDirectory: filepath.Join(dataDir, "exports"),
+	})
+	if err != nil {
+		t.Fatalf("SaveSettings: %v", err)
+	}
+
+	staleRecord := AccountRecord{
+		Name:         "server-returned-name.json",
+		Type:         "codex",
+		Provider:     "codex",
+		AuthIndex:    "healthy-auth-index",
+		State:        stateError,
+		StateKey:     stateError,
+		Status:       stateError,
+		LastSeenAt:   nowISO(),
+		LastProbedAt: nowISO(),
+		UpdatedAt:    nowISO(),
+	}
+	if err := service.store.UpsertCurrentAccount(staleRecord); err != nil {
+		t.Fatalf("UpsertCurrentAccount: %v", err)
+	}
+
+	probed, err := service.ProbeAccount(staleRecord.Name)
+	if err != nil {
+		t.Fatalf("ProbeAccount: %v", err)
+	}
+	if probed.ChatGPTAccountID != "acct-from-auth-index-file" {
+		t.Fatalf("expected local auth account id by auth index, got %q", probed.ChatGPTAccountID)
+	}
+	if probed.Email != "index-match@example.com" {
+		t.Fatalf("expected email from local auth file, got %q", probed.Email)
+	}
+	if probed.ProbeErrorKind == "missing_chatgpt_account_id" || probed.StateKey == stateError {
+		t.Fatalf("expected successful probe after local auth-index refresh, got %+v", probed)
+	}
+}

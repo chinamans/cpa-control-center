@@ -82,6 +82,56 @@ func TestClientFetchProbeAndActions(t *testing.T) {
 	}
 }
 
+func TestBuildAccountRecordExtractsNestedChatGPTAccountID(t *testing.T) {
+	t.Parallel()
+
+	client := NewClient()
+	record := client.BuildAccountRecord(map[string]any{
+		"name":     "nested-account.json",
+		"type":     "codex",
+		"provider": "codex",
+		"metadata": map[string]any{
+			"account_id": "acct-from-metadata",
+		},
+		"id_token": map[string]any{
+			"plan_type": "pro",
+		},
+	}, nil, nowISO())
+
+	if record.ChatGPTAccountID != "acct-from-metadata" {
+		t.Fatalf("expected account id from nested metadata, got %q", record.ChatGPTAccountID)
+	}
+	if record.PlanType != "pro" {
+		t.Fatalf("expected plan type from id token claims, got %q", record.PlanType)
+	}
+}
+
+func TestBuildAccountRecordPreservesPreviousChatGPTAccountID(t *testing.T) {
+	t.Parallel()
+
+	client := NewClient()
+	previous := AccountRecord{
+		Name:             "stale-account.json",
+		Type:             "codex",
+		Provider:         "codex",
+		ChatGPTAccountID: "acct-known",
+		PlanType:         "pro",
+	}
+	record := client.BuildAccountRecord(map[string]any{
+		"name":     "stale-account.json",
+		"type":     "codex",
+		"provider": "codex",
+		"id_token": "",
+	}, &previous, nowISO())
+
+	if record.ChatGPTAccountID != "acct-known" {
+		t.Fatalf("expected previous account id to be preserved, got %q", record.ChatGPTAccountID)
+	}
+	if record.PlanType != "pro" {
+		t.Fatalf("expected previous plan type to be preserved, got %q", record.PlanType)
+	}
+}
+
 func TestClientNormalizesManagedAccountNameForActions(t *testing.T) {
 	t.Parallel()
 
