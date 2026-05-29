@@ -106,7 +106,7 @@ func (c *Client) FetchAuthFiles(ctx context.Context, settings AppSettings) ([]ma
 func (c *Client) BuildAccountRecord(item map[string]any, previous *AccountRecord, timestamp string) AccountRecord {
 	record := AccountRecord{
 		Name:             strings.TrimSpace(stringValue(item["name"])),
-		AuthIndex:        strings.TrimSpace(stringValue(item["auth_index"])),
+		AuthIndex:        strings.TrimSpace(stringOr(stringValue(item["auth_index"]), stringValue(item["authIndex"]))),
 		Email:            strings.TrimSpace(stringValue(item["email"])),
 		Provider:         stringOr(stringValue(item["provider"]), stringValue(item["type"])),
 		Type:             stringOr(stringValue(item["type"]), stringValue(item["provider"])),
@@ -141,6 +141,9 @@ func (c *Client) BuildAccountRecord(item map[string]any, previous *AccountRecord
 		record.LastAction = previous.LastAction
 		record.LastActionStatus = previous.LastActionStatus
 		record.LastActionError = previous.LastActionError
+		if record.ChatGPTAccountID == "" {
+			record.ChatGPTAccountID = previous.ChatGPTAccountID
+		}
 		if record.PlanType == "" {
 			record.PlanType = previous.PlanType
 		}
@@ -704,24 +707,50 @@ func findUsageLimitErrorPayload(payload any) map[string]any {
 }
 
 func extractChatGPTAccountID(item map[string]any) string {
-	idToken := idTokenObject(item)
-	for _, source := range []map[string]any{idToken, item} {
-		for _, key := range []string{"chatgpt_account_id", "chatgptAccountId", "account_id", "accountId"} {
-			if value := strings.TrimSpace(stringValue(source[key])); value != "" {
-				return value
-			}
-		}
-	}
-	return ""
+	return findStringByKeys(item, []string{"chatgpt_account_id", "chatgptAccountId", "account_id", "accountId"}, 4)
 }
 
 func extractIDTokenPlanType(item map[string]any) string {
-	idToken := idTokenObject(item)
-	return strings.TrimSpace(stringValue(idToken["plan_type"]))
+	return findStringByKeys(item, []string{"plan_type", "planType"}, 4)
 }
 
 func idTokenObject(item map[string]any) map[string]any {
 	return objectFromAny(item["id_token"])
+}
+
+func findStringByKeys(value any, keys []string, maxDepth int) string {
+	if maxDepth < 0 {
+		return ""
+	}
+	switch typed := value.(type) {
+	case map[string]any:
+		for _, key := range keys {
+			if found := strings.TrimSpace(stringValue(typed[key])); found != "" {
+				return found
+			}
+		}
+		for _, key := range []string{"id_token", "metadata", "storage", "token_storage", "tokenStorage", "auth", "data", "file"} {
+			if found := findStringByKeys(typed[key], keys, maxDepth-1); found != "" {
+				return found
+			}
+		}
+		for _, nested := range typed {
+			if found := findStringByKeys(nested, keys, maxDepth-1); found != "" {
+				return found
+			}
+		}
+	case []any:
+		for _, nested := range typed {
+			if found := findStringByKeys(nested, keys, maxDepth-1); found != "" {
+				return found
+			}
+		}
+	case string:
+		if parsed := parseJSONString(typed); len(parsed) > 0 {
+			return findStringByKeys(parsed, keys, maxDepth-1)
+		}
+	}
+	return ""
 }
 
 func objectFromAny(value any) map[string]any {

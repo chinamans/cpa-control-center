@@ -11,6 +11,9 @@ const authFilesDirEnv = "CPA_AUTH_FILES_DIR"
 
 type localAuthIdentity struct {
 	Name             string
+	ID               string
+	AuthIndex        string
+	Path             string
 	Email            string
 	ChatGPTAccountID string
 	PlanType         string
@@ -83,6 +86,9 @@ func readLocalAuthIdentity(path string) (localAuthIdentity, bool) {
 
 	identity := localAuthIdentity{
 		Name:             stringOr(strings.TrimSpace(stringValue(item["name"])), filepath.Base(path)),
+		ID:               strings.TrimSpace(stringValue(item["id"])),
+		AuthIndex:        strings.TrimSpace(stringOr(stringValue(item["auth_index"]), stringValue(item["authIndex"]))),
+		Path:             path,
 		Email:            strings.TrimSpace(stringValue(item["email"])),
 		ChatGPTAccountID: extractChatGPTAccountID(item),
 		PlanType:         extractIDTokenPlanType(item),
@@ -94,7 +100,7 @@ func readLocalAuthIdentity(path string) (localAuthIdentity, bool) {
 }
 
 func (index localAuthIdentityIndex) add(identity localAuthIdentity) {
-	for _, name := range []string{identity.Name, normalizeManagedAccountName(identity.Name)} {
+	for _, name := range localAuthIdentityNameCandidates(identity) {
 		key := localAuthIdentityKey(name)
 		if key == "" {
 			continue
@@ -132,7 +138,7 @@ func (index localAuthIdentityIndex) enrich(record AccountRecord) AccountRecord {
 }
 
 func (index localAuthIdentityIndex) lookup(record AccountRecord) (localAuthIdentity, bool) {
-	for _, name := range []string{record.Name, normalizeManagedAccountName(record.Name)} {
+	for _, name := range accountRecordIdentityNameCandidates(record) {
 		key := localAuthIdentityKey(name)
 		if key == "" {
 			continue
@@ -147,6 +153,53 @@ func (index localAuthIdentityIndex) lookup(record AccountRecord) (localAuthIdent
 		}
 	}
 	return localAuthIdentity{}, false
+}
+
+func localAuthIdentityNameCandidates(identity localAuthIdentity) []string {
+	return identityLookupCandidates(
+		identity.Name,
+		identity.ID,
+		identity.AuthIndex,
+		identity.Path,
+	)
+}
+
+func accountRecordIdentityNameCandidates(record AccountRecord) []string {
+	return identityLookupCandidates(
+		record.Name,
+		record.AuthIndex,
+	)
+}
+
+func identityLookupCandidates(values ...string) []string {
+	seen := make(map[string]struct{})
+	var candidates []string
+	add := func(value string) {
+		value = strings.TrimSpace(value)
+		if value == "" {
+			return
+		}
+		for _, candidate := range []string{
+			value,
+			normalizeManagedAccountName(value),
+			strings.TrimSuffix(value, ".json"),
+			strings.TrimSuffix(normalizeManagedAccountName(value), ".json"),
+		} {
+			key := localAuthIdentityKey(candidate)
+			if key == "" {
+				continue
+			}
+			if _, ok := seen[key]; ok {
+				continue
+			}
+			seen[key] = struct{}{}
+			candidates = append(candidates, candidate)
+		}
+	}
+	for _, value := range values {
+		add(value)
+	}
+	return candidates
 }
 
 func localAuthIdentityKey(value string) string {
